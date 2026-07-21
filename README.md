@@ -2,7 +2,7 @@
 
 ## Overview
 
-Production-ready Proof of Concept for an enterprise notification routing system built on **Azure Logic Apps (Consumption)** and **Azure Functions (Node.js)**. Receives Azure DevOps work item webhooks, evaluates configurable routing rules, and dispatches notifications to Microsoft Teams and email distribution groups with full escalation support.
+Proof of Concept for an enterprise notification routing system built on **Azure Logic Apps (Consumption)** and **Azure Functions (Node.js)**. Receives Azure DevOps work item webhooks, evaluates configurable routing rules, and dispatches notifications to Microsoft Teams and email distribution groups with full escalation support.
 
 ## Architecture at a Glance
 
