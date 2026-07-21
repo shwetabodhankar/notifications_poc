@@ -1,0 +1,125 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    }
+  },
+  "triggers": {
+    "Receive_Teams_Notification_Request": {
+      "type": "Request",
+      "kind": "Http",
+      "inputs": {
+        "method": "POST",
+        "schema": {
+          "type": "object",
+          "required": ["correlationId", "teamsTeamId", "teamsChannelId", "workItem"],
+          "properties": {
+            "correlationId": { "type": "string" },
+            "teamsTeamId":   { "type": "string" },
+            "teamsChannelId": { "type": "string" },
+            "channelName":   { "type": "string" },
+            "ruleId":        { "type": "string" },
+            "ruleName":      { "type": "string" },
+            "scenarios": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "workItem": {
+              "type": "object",
+              "properties": {
+                "workItemId":    {},
+                "workItemUrl":   { "type": "string" },
+                "title":         { "type": "string" },
+                "state":         { "type": "string" },
+                "workItemType":  { "type": "string" },
+                "teamProject":   { "type": "string" },
+                "areaPath":      { "type": "string" },
+                "assignedTo":    { "type": "string" },
+                "priority":      { "type": "string" },
+                "product":       { "type": "string" },
+                "productFamily": { "type": "string" },
+                "isCyberSecurity": {},
+                "isHotfix":      {},
+                "eventType":     { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "actions": {
+    "Determine_Event_Action": {
+      "type": "Compose",
+      "runAfter": {},
+      "inputs": "@if(equals(triggerBody()?['workItem']?['eventType'], 'workitem.created'), 'Created', 'Updated')"
+    },
+    "Determine_Priority_Label": {
+      "type": "Compose",
+      "runAfter": {
+        "Determine_Event_Action": [ "Succeeded" ]
+      },
+      "inputs": "@triggerBody()?['workItem']?['priority']"
+    },
+    "Determine_Flags": {
+      "type": "Compose",
+      "runAfter": {
+        "Determine_Priority_Label": [ "Succeeded" ]
+      },
+      "inputs": "@concat(if(equals(coalesce(triggerBody()?['workItem']?['isCyberSecurity'], false), true), '[CYBER SECURITY] ', ''), if(equals(coalesce(triggerBody()?['workItem']?['isHotfix'], false), true), '[HOTFIX] ', ''))"
+    },
+    "Compose_Message_Body": {
+      "type": "Compose",
+      "runAfter": {
+        "Determine_Flags": [ "Succeeded" ]
+      },
+      "inputs": "@concat('<h3>', outputs('Determine_Flags'), 'Work Item ', outputs('Determine_Event_Action'), ' &mdash; ', triggerBody()?['workItem']?['product'], '</h3><table><tr><td><b>Work Item</b></td><td>#', triggerBody()?['workItem']?['workItemId'], ' &mdash; ', triggerBody()?['workItem']?['title'], '</td></tr><tr><td><b>Type</b></td><td>', triggerBody()?['workItem']?['workItemType'], '</td></tr><tr><td><b>Priority</b></td><td>', outputs('Determine_Priority_Label'), '</td></tr><tr><td><b>State</b></td><td>', triggerBody()?['workItem']?['state'], '</td></tr><tr><td><b>Assigned To</b></td><td>', coalesce(triggerBody()?['workItem']?['assignedTo'], 'Unassigned'), '</td></tr><tr><td><b>Area Path</b></td><td>', triggerBody()?['workItem']?['areaPath'], '</td></tr><tr><td><b>Project</b></td><td>', triggerBody()?['workItem']?['teamProject'], '</td></tr><tr><td><b>Routing Rule</b></td><td>[', triggerBody()?['ruleId'], '] ', triggerBody()?['ruleName'], '</td></tr><tr><td><b>Correlation ID</b></td><td>', triggerBody()?['correlationId'], '</td></tr></table><p><a href=\"', triggerBody()?['workItem']?['workItemUrl'], '\">Open in Azure DevOps</a></p>')"
+    },
+    "Post_To_Teams_Channel": {
+      "type": "ApiConnection",
+      "runAfter": {
+        "Compose_Message_Body": [ "Succeeded" ]
+      },
+      "inputs": {
+        "host": {
+          "connection": {
+            "name": "@parameters('$connections')['teams']['connectionId']"
+          }
+        },
+        "method": "post",
+        "path": "/beta/teams/conversation/message/poster/@{encodeURIComponent('User')}/location/@{encodeURIComponent('Channel')}",
+        "body": {
+          "recipient": {
+            "groupId": "@triggerBody()?['teamsTeamId']",
+            "channelId": "@triggerBody()?['teamsChannelId']"
+          },
+          "messageBody": "@outputs('Compose_Message_Body')"
+        }
+      }
+    },
+    "Return_Teams_Response": {
+      "type": "Response",
+      "kind": "Http",
+      "runAfter": {
+        "Post_To_Teams_Channel": [ "Succeeded", "Failed" ]
+      },
+      "inputs": {
+        "statusCode": "@if(equals(actions('Post_To_Teams_Channel').status, 'Succeeded'), 200, 502)",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "correlationId": "@triggerBody()?['correlationId']",
+          "channel": "TeamsConnector",
+          "channelName": "@triggerBody()?['channelName']",
+          "status": "@if(equals(actions('Post_To_Teams_Channel').status, 'Succeeded'), 'sent', 'failed')",
+          "timestamp": "@utcNow()"
+        }
+      }
+    }
+  },
+  "outputs": {}
+}

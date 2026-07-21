@@ -1,0 +1,30 @@
+# Node
+node_modules/
+npm-debug.log*
+.npm
+
+# Environment & secrets
+.env
+.env.*
+*.secret
+local.settings.json
+
+# Azure Functions local settings
+functions/local.settings.json
+
+# Build outputs
+dist/
+out/
+*.js.map
+
+# OS
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/settings.json
+.vscode/launch.json
+
+# Logs
+*.log
+logs/

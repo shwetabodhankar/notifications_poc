@@ -1,0 +1,2426 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.39.26.7824",
+      "templateHash": "6329040117813516244"
+    }
+  },
+  "parameters": {
+    "environmentName": {
+      "type": "string",
+      "allowedValues": [
+        "dev",
+        "staging",
+        "prod"
+      ],
+      "metadata": {
+        "description": "Environment name: dev, staging, or prod"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for all resources"
+      }
+    },
+    "appName": {
+      "type": "string",
+      "defaultValue": "notifpoc",
+      "maxLength": 10,
+      "metadata": {
+        "description": "Short application name used in resource naming"
+      }
+    },
+    "webhookSharedSecret": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Azure DevOps webhook shared secret — stored in Key Vault post-deploy"
+      }
+    },
+    "sendGridApiKey": {
+      "type": "securestring",
+      "defaultValue": "SENDGRID_NOT_CONFIGURED",
+      "metadata": {
+        "description": "SendGrid API key for email delivery. Leave as default placeholder to skip email — Teams notifications still work."
+      }
+    },
+    "notificationFromEmail": {
+      "type": "string",
+      "defaultValue": "notifications@company.com",
+      "metadata": {
+        "description": "Email address used as the From address for notifications"
+      }
+    },
+    "logRetentionDays": {
+      "type": "int",
+      "defaultValue": 90,
+      "minValue": 30,
+      "maxValue": 730,
+      "metadata": {
+        "description": "Log Analytics workspace retention in days"
+      }
+    },
+    "adoOrganisationUrl": {
+      "type": "string",
+      "defaultValue": "https://dev.azure.com",
+      "metadata": {
+        "description": "Azure DevOps organisation base URL, e.g. https://dev.azure.com/myorg"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "environment": "[parameters('environmentName')]",
+        "application": "enterprise-notification-routing",
+        "managedBy": "bicep",
+        "costCenter": "platform-engineering"
+      },
+      "metadata": {
+        "description": "Tags applied to all resources"
+      }
+    }
+  },
+  "variables": {
+    "storageAccountName": "[replace(format('st{0}{1}', parameters('appName'), parameters('environmentName')), '-', '')]",
+    "keyVaultName": "[format('kv-{0}-{1}', parameters('appName'), parameters('environmentName'))]",
+    "appInsightsName": "[format('appi-{0}-{1}', parameters('appName'), parameters('environmentName'))]",
+    "logAnalyticsName": "[format('law-{0}-{1}', parameters('appName'), parameters('environmentName'))]",
+    "orchestratorLaName": "[format('la-notif-orchestrator-{0}', parameters('environmentName'))]",
+    "dispatcherLaName": "[format('la-notif-dispatcher-{0}', parameters('environmentName'))]",
+    "teamsNotifierLaName": "[format('la-notif-teams-{0}', parameters('environmentName'))]",
+    "emailNotifierLaName": "[format('la-notif-email-{0}', parameters('environmentName'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('storage-{0}', parameters('environmentName'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "storageAccountName": {
+            "value": "[variables('storageAccountName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.39.26.7824",
+              "templateHash": "13526783323570013168"
+            }
+          },
+          "parameters": {
+            "storageAccountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Storage account name (globally unique, 3-24 alphanumeric lowercase)"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Resource tags"
+              }
+            },
+            "rulesContainerName": {
+              "type": "string",
+              "defaultValue": "routing-rules",
+              "metadata": {
+                "description": "Name of the Blob container for routing rules"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Storage/storageAccounts",
+              "apiVersion": "2023-01-01",
+              "name": "[parameters('storageAccountName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "Standard_LRS"
+              },
+              "kind": "StorageV2",
+              "properties": {
+                "minimumTlsVersion": "TLS1_2",
+                "allowBlobPublicAccess": false,
+                "supportsHttpsTrafficOnly": true,
+                "accessTier": "Hot",
+                "encryption": {
+                  "services": {
+                    "blob": {
+                      "enabled": true,
+                      "keyType": "Account"
+                    },
+                    "file": {
+                      "enabled": true,
+                      "keyType": "Account"
+                    }
+                  },
+                  "keySource": "Microsoft.Storage"
+                },
+                "networkAcls": {
+                  "defaultAction": "Allow",
+                  "bypass": "AzureServices"
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Storage/storageAccounts/blobServices",
+              "apiVersion": "2023-01-01",
+              "name": "[format('{0}/{1}', parameters('storageAccountName'), 'default')]",
+              "properties": {
+                "isVersioningEnabled": true,
+                "deleteRetentionPolicy": {
+                  "enabled": true,
+                  "days": 30
+                },
+                "containerDeleteRetentionPolicy": {
+                  "enabled": true,
+                  "days": 7
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+              "apiVersion": "2023-01-01",
+              "name": "[format('{0}/{1}/{2}', parameters('storageAccountName'), 'default', parameters('rulesContainerName'))]",
+              "properties": {
+                "publicAccess": "None",
+                "metadata": {
+                  "purpose": "notification-routing-rules"
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('storageAccountName'), 'default')]"
+              ]
+            },
+            {
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+              "apiVersion": "2023-01-01",
+              "name": "[format('{0}/{1}/{2}', parameters('storageAccountName'), 'default', 'dead-letter')]",
+              "properties": {
+                "publicAccess": "None",
+                "metadata": {
+                  "purpose": "failed-event-replay"
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('storageAccountName'), 'default')]"
+              ]
+            }
+          ],
+          "outputs": {
+            "storageAccountId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
+            },
+            "storageAccountName": {
+              "type": "string",
+              "value": "[parameters('storageAccountName')]"
+            },
+            "rulesContainerName": {
+              "type": "string",
+              "value": "[parameters('rulesContainerName')]"
+            },
+            "primaryEndpoint": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2023-01-01').primaryEndpoints.blob]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('keyvault-{0}', parameters('environmentName'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "keyVaultName": {
+            "value": "[variables('keyVaultName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "webhookSharedSecret": {
+            "value": "[parameters('webhookSharedSecret')]"
+          },
+          "sendGridApiKey": {
+            "value": "[parameters('sendGridApiKey')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.39.26.7824",
+              "templateHash": "12871306942117038028"
+            }
+          },
+          "parameters": {
+            "keyVaultName": {
+              "type": "string",
+              "metadata": {
+                "description": "Key Vault name (3-24 chars, globally unique)"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Resource tags"
+              }
+            },
+            "tenantId": {
+              "type": "string",
+              "defaultValue": "[subscription().tenantId]",
+              "metadata": {
+                "description": "Azure AD tenant ID"
+              }
+            },
+            "webhookSharedSecret": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Webhook shared secret for ADO webhook validation"
+              }
+            },
+            "sendGridApiKey": {
+              "type": "securestring",
+              "defaultValue": "SENDGRID_NOT_CONFIGURED",
+              "metadata": {
+                "description": "SendGrid API key for email delivery. Defaults to placeholder when not provided."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.KeyVault/vaults",
+              "apiVersion": "2023-07-01",
+              "name": "[parameters('keyVaultName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "sku": {
+                  "family": "A",
+                  "name": "standard"
+                },
+                "tenantId": "[parameters('tenantId')]",
+                "enableRbacAuthorization": true,
+                "enableSoftDelete": true,
+                "softDeleteRetentionInDays": 90,
+                "enablePurgeProtection": true,
+                "enabledForDeployment": false,
+                "enabledForDiskEncryption": false,
+                "enabledForTemplateDeployment": false,
+                "networkAcls": {
+                  "defaultAction": "Allow",
+                  "bypass": "AzureServices"
+                }
+              }
+            },
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/{1}', parameters('keyVaultName'), 'webhookSharedSecret')]",
+              "properties": {
+                "value": "[parameters('webhookSharedSecret')]",
+                "attributes": {
+                  "enabled": true
+                },
+                "contentType": "text/plain"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/{1}', parameters('keyVaultName'), 'sendGridApiKey')]",
+              "properties": {
+                "value": "[parameters('sendGridApiKey')]",
+                "attributes": {
+                  "enabled": true
+                },
+                "contentType": "text/plain"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/{1}', parameters('keyVaultName'), 'dispatcherCallbackUrl')]",
+              "properties": {
+                "value": "PLACEHOLDER — update after Logic App deployment",
+                "attributes": {
+                  "enabled": true
+                },
+                "contentType": "text/plain"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/{1}', parameters('keyVaultName'), 'ruleEngineUrl')]",
+              "properties": {
+                "value": "PLACEHOLDER — update after Function App deployment",
+                "attributes": {
+                  "enabled": true
+                },
+                "contentType": "text/plain"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "keyVaultId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+            },
+            "keyVaultName": {
+              "type": "string",
+              "value": "[parameters('keyVaultName')]"
+            },
+            "keyVaultUri": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri]"
+            },
+            "webhookSecretUri": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), 'webhookSharedSecret'), '2023-07-01').secretUri]"
+            },
+            "sendGridSecretUri": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), 'sendGridApiKey'), '2023-07-01').secretUri]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('appinsights-{0}', parameters('environmentName'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "appInsightsName": {
+            "value": "[variables('appInsightsName')]"
+          },
+          "logAnalyticsName": {
+            "value": "[variables('logAnalyticsName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "retentionDays": {
+            "value": "[parameters('logRetentionDays')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.39.26.7824",
+              "templateHash": "12037187465322719619"
+            }
+          },
+          "parameters": {
+            "appInsightsName": {
+              "type": "string",
+              "metadata": {
+                "description": "Application Insights resource name"
+              }
+            },
+            "logAnalyticsName": {
+              "type": "string",
+              "metadata": {
+                "description": "Log Analytics Workspace resource name"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region"
+              }
+            },
+            "retentionDays": {
+              "type": "int",
+              "defaultValue": 90,
+              "minValue": 30,
+              "maxValue": 730,
+              "metadata": {
+                "description": "Data retention in days (30-730)"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Resource tags"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.OperationalInsights/workspaces",
+              "apiVersion": "2023-09-01",
+              "name": "[parameters('logAnalyticsName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "sku": {
+                  "name": "PerGB2018"
+                },
+                "retentionInDays": "[parameters('retentionDays')]",
+                "features": {
+                  "enableLogAccessUsingOnlyResourcePermissions": true
+                },
+                "workspaceCapping": {
+                  "dailyQuotaGb": 1
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Insights/components",
+              "apiVersion": "2020-02-02",
+              "name": "[parameters('appInsightsName')]",
+              "location": "[parameters('location')]",
+              "kind": "web",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "Application_Type": "web",
+                "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsName'))]",
+                "IngestionMode": "LogAnalytics",
+                "publicNetworkAccessForIngestion": "Enabled",
+                "publicNetworkAccessForQuery": "Enabled",
+                "RetentionInDays": "[parameters('retentionDays')]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "appInsightsId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Insights/components', parameters('appInsightsName'))]"
+            },
+            "appInsightsName": {
+              "type": "string",
+              "value": "[parameters('appInsightsName')]"
+            },
+            "instrumentationKey": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Insights/components', parameters('appInsightsName')), '2020-02-02').InstrumentationKey]"
+            },
+            "connectionString": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Insights/components', parameters('appInsightsName')), '2020-02-02').ConnectionString]"
+            },
+            "logAnalyticsWorkspaceId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsName'))]"
+            },
+            "logAnalyticsWorkspaceName": {
+              "type": "string",
+              "value": "[parameters('logAnalyticsName')]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('logicapps-{0}', parameters('environmentName'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "orchestratorLaName": {
+            "value": "[variables('orchestratorLaName')]"
+          },
+          "dispatcherLaName": {
+            "value": "[variables('dispatcherLaName')]"
+          },
+          "teamsNotifierLaName": {
+            "value": "[variables('teamsNotifierLaName')]"
+          },
+          "emailNotifierLaName": {
+            "value": "[variables('emailNotifierLaName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "storageAccountName": {
+            "value": "[variables('storageAccountName')]"
+          },
+          "webhookSharedSecret": {
+            "value": "[parameters('webhookSharedSecret')]"
+          },
+          "sendGridApiKey": {
+            "value": "[parameters('sendGridApiKey')]"
+          },
+          "notificationFromEmail": {
+            "value": "[parameters('notificationFromEmail')]"
+          },
+          "adoOrganisationUrl": {
+            "value": "[parameters('adoOrganisationUrl')]"
+          },
+          "logAnalyticsWorkspaceId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', format('appinsights-{0}', parameters('environmentName'))), '2025-04-01').outputs.logAnalyticsWorkspaceId.value]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.39.26.7824",
+              "templateHash": "12441909317358630863"
+            }
+          },
+          "parameters": {
+            "orchestratorLaName": {
+              "type": "string",
+              "metadata": {
+                "description": "Orchestrator Logic App name"
+              }
+            },
+            "dispatcherLaName": {
+              "type": "string",
+              "metadata": {
+                "description": "Dispatcher Logic App name"
+              }
+            },
+            "teamsNotifierLaName": {
+              "type": "string",
+              "metadata": {
+                "description": "Teams Notifier Logic App name"
+              }
+            },
+            "emailNotifierLaName": {
+              "type": "string",
+              "metadata": {
+                "description": "Email Notifier Logic App name"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region"
+              }
+            },
+            "storageAccountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Storage Account name hosting routing-rules.json"
+              }
+            },
+            "webhookSharedSecret": {
+              "type": "securestring",
+              "metadata": {
+                "description": "ADO webhook shared secret used to validate incoming webhook calls"
+              }
+            },
+            "sendGridApiKey": {
+              "type": "securestring",
+              "metadata": {
+                "description": "SendGrid API key"
+              }
+            },
+            "notificationFromEmail": {
+              "type": "string",
+              "metadata": {
+                "description": "Notification from email address"
+              }
+            },
+            "adoOrganisationUrl": {
+              "type": "string",
+              "defaultValue": "https://dev.azure.com",
+              "metadata": {
+                "description": "Azure DevOps organisation base URL, e.g. https://dev.azure.com/myorg"
+              }
+            },
+            "logAnalyticsWorkspaceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Log Analytics Workspace resource ID for diagnostic settings"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Resource tags"
+              }
+            }
+          },
+          "variables": {
+            "$fxv#0": {
+              "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+              "contentVersion": "1.0.0.0",
+              "parameters": {},
+              "triggers": {
+                "Receive_Teams_Notification_Request": {
+                  "type": "Request",
+                  "kind": "Http",
+                  "inputs": {
+                    "method": "POST",
+                    "schema": {
+                      "type": "object",
+                      "required": [
+                        "correlationId",
+                        "channelWebhookUrl",
+                        "workItem"
+                      ],
+                      "properties": {
+                        "correlationId": {
+                          "type": "string"
+                        },
+                        "channelWebhookUrl": {
+                          "type": "string"
+                        },
+                        "channelName": {
+                          "type": "string"
+                        },
+                        "ruleId": {
+                          "type": "string"
+                        },
+                        "ruleName": {
+                          "type": "string"
+                        },
+                        "scenarios": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "workItem": {
+                          "type": "object",
+                          "properties": {
+                            "workItemId": {},
+                            "workItemUrl": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "state": {
+                              "type": "string"
+                            },
+                            "workItemType": {
+                              "type": "string"
+                            },
+                            "teamProject": {
+                              "type": "string"
+                            },
+                            "areaPath": {
+                              "type": "string"
+                            },
+                            "assignedTo": {
+                              "type": "string"
+                            },
+                            "priority": {
+                              "type": "string"
+                            },
+                            "product": {
+                              "type": "string"
+                            },
+                            "productFamily": {
+                              "type": "string"
+                            },
+                            "isCyberSecurity": {},
+                            "isHotfix": {},
+                            "eventType": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "actions": {
+                "Determine_Event_Action": {
+                  "type": "Compose",
+                  "runAfter": {},
+                  "inputs": "@if(equals(triggerBody()?['workItem']?['eventType'], 'workitem.created'), 'Created', 'Updated')"
+                },
+                "Determine_Priority_Color": {
+                  "type": "Compose",
+                  "runAfter": {
+                    "Determine_Event_Action": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": "@if(equals(triggerBody()?['workItem']?['priority'], '1'), 'attention', if(equals(triggerBody()?['workItem']?['priority'], '2'), 'warning', 'good'))"
+                },
+                "Determine_Scenario_Label": {
+                  "type": "Compose",
+                  "runAfter": {
+                    "Determine_Priority_Color": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": "@concat(if(contains(triggerBody()?['routingResult']?['scenarios'], 'C'), '🔒 CYBER SECURITY | ', ''), if(contains(triggerBody()?['routingResult']?['scenarios'], 'B'), '🚨 P1 CRITICAL | ', ''), 'Scenario A')"
+                },
+                "Compose_Adaptive_Card": {
+                  "type": "Compose",
+                  "runAfter": {
+                    "Determine_Scenario_Label": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "type": "message",
+                    "attachments": [
+                      {
+                        "contentType": "application/vnd.microsoft.card.adaptive",
+                        "content": {
+                          "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                          "type": "AdaptiveCard",
+                          "version": "1.5",
+                          "body": [
+                            {
+                              "type": "Container",
+                              "style": "@outputs('Determine_Priority_Color')",
+                              "items": [
+                                {
+                                  "type": "ColumnSet",
+                                  "columns": [
+                                    {
+                                      "type": "Column",
+                                      "width": "stretch",
+                                      "items": [
+                                        {
+                                          "type": "TextBlock",
+                                          "text": "@{concat('Work Item ', outputs('Determine_Event_Action'), ' — ', triggerBody()?['workItem']?['product'])}",
+                                          "weight": "Bolder",
+                                          "size": "Medium",
+                                          "wrap": true
+                                        },
+                                        {
+                                          "type": "TextBlock",
+                                          "text": "@outputs('Determine_Scenario_Label')",
+                                          "size": "Small",
+                                          "isSubtle": true
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "FactSet",
+                              "facts": [
+                                {
+                                  "title": "Work Item",
+                                  "value": "@{concat('#', triggerBody()?['workItem']?['workItemId'], ' — ', triggerBody()?['workItem']?['title'])}"
+                                },
+                                {
+                                  "title": "Type",
+                                  "value": "@triggerBody()?['workItem']?['workItemType']"
+                                },
+                                {
+                                  "title": "Priority",
+                                  "value": "@{concat('P', triggerBody()?['workItem']?['priority'])}"
+                                },
+                                {
+                                  "title": "State",
+                                  "value": "@triggerBody()?['workItem']?['state']"
+                                },
+                                {
+                                  "title": "Product",
+                                  "value": "@{concat(triggerBody()?['workItem']?['product'], if(empty(triggerBody()?['workItem']?['productFamily']), '', concat(' / ', triggerBody()?['workItem']?['productFamily'])))}"
+                                },
+                                {
+                                  "title": "Area Path",
+                                  "value": "@triggerBody()?['workItem']?['areaPath']"
+                                },
+                                {
+                                  "title": "Assigned To",
+                                  "value": "@coalesce(triggerBody()?['workItem']?['assignedTo'], 'Unassigned')"
+                                },
+                                {
+                                  "title": "Project",
+                                  "value": "@triggerBody()?['workItem']?['teamProject']"
+                                },
+                                {
+                                  "title": "Routing Rule",
+                                  "value": "@{concat('[', triggerBody()?['ruleId'], '] ', triggerBody()?['ruleName'])}"
+                                },
+                                {
+                                  "title": "Correlation ID",
+                                  "value": "@triggerBody()?['correlationId']"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "ActionSet",
+                              "actions": [
+                                {
+                                  "type": "Action.OpenUrl",
+                                  "title": "Open in Azure DevOps",
+                                  "url": "@triggerBody()?['workItem']?['workItemUrl']"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                },
+                "Post_To_Teams_Channel": {
+                  "type": "Http",
+                  "runAfter": {
+                    "Compose_Adaptive_Card": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "method": "POST",
+                    "uri": "@triggerBody()?['channelWebhookUrl']",
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": "@outputs('Compose_Adaptive_Card')",
+                    "retryPolicy": {
+                      "type": "exponential",
+                      "count": 3,
+                      "interval": "PT5S",
+                      "minimumInterval": "PT5S",
+                      "maximumInterval": "PT30S"
+                    }
+                  }
+                },
+                "Return_Teams_Response": {
+                  "type": "Response",
+                  "kind": "Http",
+                  "runAfter": {
+                    "Post_To_Teams_Channel": [
+                      "Succeeded",
+                      "Failed"
+                    ]
+                  },
+                  "inputs": {
+                    "statusCode": "@if(equals(outputs('Post_To_Teams_Channel')?['statusCode'], 200), 200, 502)",
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "correlationId": "@triggerBody()?['correlationId']",
+                      "channel": "Teams",
+                      "channelName": "@triggerBody()?['channelName']",
+                      "status": "@if(equals(outputs('Post_To_Teams_Channel')?['statusCode'], 200), 'sent', 'failed')",
+                      "teamsStatusCode": "@outputs('Post_To_Teams_Channel')?['statusCode']",
+                      "timestamp": "@utcNow()"
+                    }
+                  }
+                }
+              },
+              "outputs": {}
+            },
+            "$fxv#1": {
+              "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+              "contentVersion": "1.0.0.0",
+              "parameters": {
+                "sendGridApiKey": {
+                  "type": "securestring",
+                  "metadata": {
+                    "description": "SendGrid API key stored in Key Vault"
+                  }
+                },
+                "emailFromAddress": {
+                  "type": "string",
+                  "defaultValue": "notifications@company.com",
+                  "metadata": {
+                    "description": "From address for all notification emails"
+                  }
+                },
+                "emailFromName": {
+                  "type": "string",
+                  "defaultValue": "Azure DevOps Notifications",
+                  "metadata": {
+                    "description": "Friendly from name for notification emails"
+                  }
+                },
+                "adoBaseUrl": {
+                  "type": "string",
+                  "defaultValue": "https://dev.azure.com",
+                  "metadata": {
+                    "description": "Base URL for Azure DevOps links"
+                  }
+                }
+              },
+              "triggers": {
+                "Receive_Email_Notification_Request": {
+                  "type": "Request",
+                  "kind": "Http",
+                  "inputs": {
+                    "method": "POST",
+                    "schema": {
+                      "type": "object",
+                      "required": [
+                        "correlationId",
+                        "emailTo",
+                        "emailType",
+                        "workItem"
+                      ],
+                      "properties": {
+                        "correlationId": {
+                          "type": "string"
+                        },
+                        "emailTo": {
+                          "type": "string"
+                        },
+                        "emailType": {
+                          "type": "string",
+                          "enum": [
+                            "primary",
+                            "escalation",
+                            "security-liaison"
+                          ]
+                        },
+                        "ruleId": {
+                          "type": "string"
+                        },
+                        "ruleName": {
+                          "type": "string"
+                        },
+                        "scenarios": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "workItem": {
+                          "type": "object"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "actions": {
+                "Determine_Email_Subject_Prefix": {
+                  "type": "Compose",
+                  "runAfter": {},
+                  "inputs": "@if(equals(triggerBody()?['emailType'], 'security-liaison'), '[SECURITY ESCALATION]', if(equals(triggerBody()?['emailType'], 'escalation'), '[P1 ESCALATION]', '[ADO Notification]'))"
+                },
+                "Determine_Priority_Label": {
+                  "type": "Compose",
+                  "runAfter": {
+                    "Determine_Email_Subject_Prefix": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": "@concat('P', triggerBody()?['workItem']?['priority'])"
+                },
+                "Compose_Email_Subject": {
+                  "type": "Compose",
+                  "runAfter": {
+                    "Determine_Priority_Label": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": "@{concat(outputs('Determine_Email_Subject_Prefix'), ' [', outputs('Determine_Priority_Label'), '] ', triggerBody()?['workItem']?['product'], ' — #', triggerBody()?['workItem']?['workItemId'], ': ', triggerBody()?['workItem']?['title'])}"
+                },
+                "Compose_Email_Body_HTML": {
+                  "type": "Compose",
+                  "runAfter": {
+                    "Compose_Email_Subject": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": "@concat(\n  '<!DOCTYPE html><html><head>',\n  '<style>',\n  'body { font-family: Segoe UI, Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }',\n  '.container { max-width: 650px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }',\n  '.header { background: ', if(equals(triggerBody()?['workItem']?['priority'], '1'), '#D83B01', if(equals(triggerBody()?['workItem']?['priority'], '2'), '#E86500', '#0078D4')), '; color: white; padding: 20px 24px; }',\n  '.header h1 { margin: 0; font-size: 18px; }',\n  '.header .subtitle { margin: 4px 0 0; font-size: 13px; opacity: 0.85; }',\n  '.body { padding: 24px; }',\n  '.fact-table { width: 100%; border-collapse: collapse; margin: 16px 0; }',\n  '.fact-table td { padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 14px; }',\n  '.fact-table td:first-child { font-weight: 600; color: #444; width: 130px; }',\n  '.badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 12px; font-weight: 600; }',\n  '.badge-critical { background: #FDE7E9; color: #D83B01; }',\n  '.badge-security { background: #FDE7E9; color: #A4262C; }',\n  '.badge-normal { background: #EFF6FC; color: #0078D4; }',\n  '.cta { margin: 20px 0 0; text-align: center; }',\n  '.cta a { background: #0078D4; color: white; padding: 10px 24px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 600; }',\n  '.footer { padding: 16px 24px; background: #f9f9f9; font-size: 12px; color: #666; border-top: 1px solid #eee; }',\n  '</style></head><body>',\n  '<div class=\"container\">',\n  '<div class=\"header\">',\n  '<h1>Work Item ', if(equals(triggerBody()?['workItem']?['eventType'], 'workitem.created'), 'Created', 'Updated'), '</h1>',\n  '<div class=\"subtitle\">', triggerBody()?['workItem']?['product'], ' | ', triggerBody()?['emailType'], ' notification</div>',\n  '</div>',\n  '<div class=\"body\">',\n  if(contains(triggerBody()?['scenarios'], 'C'), '<p style=\"background:#FDE7E9;border-left:4px solid #A4262C;padding:10px 14px;margin:0 0 16px;\"><strong>⚠ Cyber Security Escalation:</strong> This work item has been flagged as a cyber security issue and requires immediate attention from the security team.</p>', ''),\n  if(contains(triggerBody()?['scenarios'], 'B'), '<p style=\"background:#FEF0CD;border-left:4px solid #E86500;padding:10px 14px;margin:0 0 16px;\"><strong>🚨 P1 Escalation:</strong> This is a Priority 1 item. Management escalation has been triggered.</p>', ''),\n  '<table class=\"fact-table\">',\n  '<tr><td>Work Item ID</td><td>#', triggerBody()?['workItem']?['workItemId'], '</td></tr>',\n  '<tr><td>Title</td><td>', triggerBody()?['workItem']?['title'], '</td></tr>',\n  '<tr><td>Type</td><td>', triggerBody()?['workItem']?['workItemType'], '</td></tr>',\n  '<tr><td>Priority</td><td><span class=\"badge ', if(equals(triggerBody()?['workItem']?['priority'], '1'), 'badge-critical', 'badge-normal'), '\">', outputs('Determine_Priority_Label'), '</span></td></tr>',\n  '<tr><td>State</td><td>', triggerBody()?['workItem']?['state'], '</td></tr>',\n  '<tr><td>Product</td><td>', triggerBody()?['workItem']?['product'], if(empty(triggerBody()?['workItem']?['productFamily']), '', concat(' / ', triggerBody()?['workItem']?['productFamily'])), '</td></tr>',\n  '<tr><td>Area Path</td><td>', triggerBody()?['workItem']?['areaPath'], '</td></tr>',\n  '<tr><td>Project</td><td>', triggerBody()?['workItem']?['teamProject'], '</td></tr>',\n  '<tr><td>Assigned To</td><td>', coalesce(triggerBody()?['workItem']?['assignedTo'], 'Unassigned'), '</td></tr>',\n  if(equals(triggerBody()?['workItem']?['isCyberSecurity'], true), '<tr><td>Cyber Security</td><td><span class=\"badge badge-security\">YES</span></td></tr>', ''),\n  if(equals(triggerBody()?['workItem']?['isHotfix'], true), '<tr><td>Hotfix</td><td><span class=\"badge badge-critical\">YES</span></td></tr>', ''),\n  '<tr><td>Routing Rule</td><td>[', triggerBody()?['ruleId'], '] ', triggerBody()?['ruleName'], '</td></tr>',\n  '<tr><td>Correlation ID</td><td><code style=\"font-size:11px;\">', triggerBody()?['correlationId'], '</code></td></tr>',\n  '</table>',\n  '<div class=\"cta\"><a href=\"', triggerBody()?['workItem']?['workItemUrl'], '\">Open in Azure DevOps</a></div>',\n  '</div>',\n  '<div class=\"footer\">This notification was sent by the Azure Logic Apps Notification Routing System. Do not reply to this email.<br/>',\n  'Notification sent at ', utcNow('R'), '</div>',\n  '</div></body></html>'\n)"
+                },
+                "Send_Email_Via_SendGrid": {
+                  "type": "Http",
+                  "runAfter": {
+                    "Compose_Email_Body_HTML": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "method": "POST",
+                    "uri": "https://api.sendgrid.com/v3/mail/send",
+                    "headers": {
+                      "Authorization": "@{concat('Bearer ', parameters('sendGridApiKey'))}",
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "personalizations": [
+                        {
+                          "to": [
+                            {
+                              "email": "@triggerBody()?['emailTo']"
+                            }
+                          ],
+                          "subject": "@outputs('Compose_Email_Subject')"
+                        }
+                      ],
+                      "from": {
+                        "email": "@parameters('emailFromAddress')",
+                        "name": "@parameters('emailFromName')"
+                      },
+                      "content": [
+                        {
+                          "type": "text/html",
+                          "value": "@outputs('Compose_Email_Body_HTML')"
+                        }
+                      ],
+                      "tracking_settings": {
+                        "click_tracking": {
+                          "enable": true
+                        },
+                        "open_tracking": {
+                          "enable": true
+                        }
+                      },
+                      "custom_args": {
+                        "correlationId": "@triggerBody()?['correlationId']",
+                        "ruleId": "@triggerBody()?['ruleId']",
+                        "workItemId": "@{triggerBody()?['workItem']?['workItemId']}"
+                      }
+                    },
+                    "retryPolicy": {
+                      "type": "exponential",
+                      "count": 3,
+                      "interval": "PT5S",
+                      "minimumInterval": "PT5S",
+                      "maximumInterval": "PT30S"
+                    }
+                  }
+                },
+                "Return_Email_Response": {
+                  "type": "Response",
+                  "kind": "Http",
+                  "runAfter": {
+                    "Send_Email_Via_SendGrid": [
+                      "Succeeded",
+                      "Failed"
+                    ]
+                  },
+                  "inputs": {
+                    "statusCode": "@if(equals(outputs('Send_Email_Via_SendGrid')?['statusCode'], 202), 200, 502)",
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "correlationId": "@triggerBody()?['correlationId']",
+                      "channel": "Email",
+                      "emailTo": "@triggerBody()?['emailTo']",
+                      "emailType": "@triggerBody()?['emailType']",
+                      "status": "@if(equals(outputs('Send_Email_Via_SendGrid')?['statusCode'], 202), 'sent', 'failed')",
+                      "sendGridStatusCode": "@outputs('Send_Email_Via_SendGrid')?['statusCode']",
+                      "timestamp": "@utcNow()"
+                    }
+                  }
+                }
+              },
+              "outputs": {}
+            },
+            "$fxv#2": {
+              "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+              "contentVersion": "1.0.0.0",
+              "parameters": {
+                "teamsNotifierUrl": {
+                  "type": "securestring",
+                  "metadata": {
+                    "description": "HTTP trigger URL of the Teams Notifier Logic App"
+                  }
+                },
+                "emailNotifierUrl": {
+                  "type": "securestring",
+                  "metadata": {
+                    "description": "HTTP trigger URL of the Email Notifier Logic App"
+                  }
+                }
+              },
+              "triggers": {
+                "Receive_Dispatch_Request": {
+                  "type": "Request",
+                  "kind": "Http",
+                  "inputs": {
+                    "method": "POST",
+                    "schema": {
+                      "type": "object",
+                      "required": [
+                        "correlationId",
+                        "workItem",
+                        "routingResult"
+                      ],
+                      "properties": {
+                        "correlationId": {
+                          "type": "string"
+                        },
+                        "workItem": {
+                          "type": "object"
+                        },
+                        "routingResult": {
+                          "type": "object",
+                          "properties": {
+                            "matchedRuleCount": {
+                              "type": "integer"
+                            },
+                            "routingDecisions": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "ruleId": {
+                                    "type": "string"
+                                  },
+                                  "ruleName": {
+                                    "type": "string"
+                                  },
+                                  "routing": {
+                                    "type": "object"
+                                  }
+                                }
+                              }
+                            },
+                            "scenarios": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "actions": {
+                "Initialize_DispatchResults": {
+                  "type": "InitializeVariable",
+                  "runAfter": {},
+                  "inputs": {
+                    "variables": [
+                      {
+                        "name": "dispatchResults",
+                        "type": "array",
+                        "value": []
+                      }
+                    ]
+                  }
+                },
+                "Check_Has_Routing_Decisions": {
+                  "type": "If",
+                  "runAfter": {
+                    "Initialize_DispatchResults": [
+                      "Succeeded"
+                    ]
+                  },
+                  "expression": {
+                    "greater": [
+                      "@coalesce(triggerBody()?['routingResult']?['matchedRuleCount'], 0)",
+                      0
+                    ]
+                  },
+                  "actions": {
+                    "For_Each_Routing_Decision": {
+                      "type": "Foreach",
+                      "runAfter": {},
+                      "foreach": "@triggerBody()?['routingResult']?['routingDecisions']",
+                      "runtimeConfiguration": {
+                        "concurrency": {
+                          "repetitions": 1
+                        }
+                      },
+                      "actions": {
+                        "Dispatch_Teams_Notification": {
+                          "type": "If",
+                          "runAfter": {},
+                          "expression": {
+                            "and": [
+                              {
+                                "not": {
+                                  "equals": [
+                                    "@item()?['routing']?['teamsChannelWebhookUrl']",
+                                    null
+                                  ]
+                                }
+                              },
+                              {
+                                "not": {
+                                  "equals": [
+                                    "@item()?['routing']?['teamsChannelWebhookUrl']",
+                                    ""
+                                  ]
+                                }
+                              }
+                            ]
+                          },
+                          "actions": {
+                            "Call_Teams_Notifier": {
+                              "type": "Http",
+                              "runAfter": {},
+                              "inputs": {
+                                "method": "POST",
+                                "uri": "@parameters('teamsNotifierUrl')",
+                                "headers": {
+                                  "Content-Type": "application/json",
+                                  "x-correlation-id": "@triggerBody()?['correlationId']"
+                                },
+                                "body": {
+                                  "correlationId": "@triggerBody()?['correlationId']",
+                                  "channelWebhookUrl": "@item()?['routing']?['teamsChannelWebhookUrl']",
+                                  "channelName": "@item()?['routing']?['teamsChannelName']",
+                                  "workItem": "@triggerBody()?['workItem']",
+                                  "ruleId": "@item()?['ruleId']",
+                                  "ruleName": "@item()?['ruleName']",
+                                  "scenarios": "@triggerBody()?['routingResult']?['scenarios']"
+                                },
+                                "retryPolicy": {
+                                  "type": "exponential",
+                                  "count": 3,
+                                  "interval": "PT5S",
+                                  "minimumInterval": "PT5S",
+                                  "maximumInterval": "PT30S"
+                                }
+                              }
+                            }
+                          },
+                          "else": {
+                            "actions": {}
+                          }
+                        },
+                        "Dispatch_Email_Notification": {
+                          "type": "If",
+                          "runAfter": {
+                            "Dispatch_Teams_Notification": [
+                              "Succeeded",
+                              "Skipped"
+                            ]
+                          },
+                          "expression": {
+                            "and": [
+                              {
+                                "not": {
+                                  "equals": [
+                                    "@item()?['routing']?['emailGroup']",
+                                    null
+                                  ]
+                                }
+                              },
+                              {
+                                "not": {
+                                  "equals": [
+                                    "@item()?['routing']?['emailGroup']",
+                                    ""
+                                  ]
+                                }
+                              }
+                            ]
+                          },
+                          "actions": {
+                            "Call_Email_Notifier_Primary": {
+                              "type": "Http",
+                              "runAfter": {},
+                              "inputs": {
+                                "method": "POST",
+                                "uri": "@parameters('emailNotifierUrl')",
+                                "headers": {
+                                  "Content-Type": "application/json",
+                                  "x-correlation-id": "@triggerBody()?['correlationId']"
+                                },
+                                "body": {
+                                  "correlationId": "@triggerBody()?['correlationId']",
+                                  "emailTo": "@item()?['routing']?['emailGroup']",
+                                  "emailType": "primary",
+                                  "workItem": "@triggerBody()?['workItem']",
+                                  "ruleId": "@item()?['ruleId']",
+                                  "ruleName": "@item()?['ruleName']",
+                                  "scenarios": "@triggerBody()?['routingResult']?['scenarios']"
+                                },
+                                "retryPolicy": {
+                                  "type": "exponential",
+                                  "count": 3,
+                                  "interval": "PT5S",
+                                  "minimumInterval": "PT5S",
+                                  "maximumInterval": "PT30S"
+                                }
+                              }
+                            }
+                          },
+                          "else": {
+                            "actions": {}
+                          }
+                        },
+                        "Dispatch_Escalation_Email": {
+                          "type": "If",
+                          "runAfter": {
+                            "Dispatch_Email_Notification": [
+                              "Succeeded",
+                              "Skipped"
+                            ]
+                          },
+                          "expression": {
+                            "and": [
+                              {
+                                "not": {
+                                  "equals": [
+                                    "@item()?['routing']?['escalationGroup']",
+                                    null
+                                  ]
+                                }
+                              },
+                              {
+                                "contains": [
+                                  "@triggerBody()?['routingResult']?['scenarios']",
+                                  "B"
+                                ]
+                              }
+                            ]
+                          },
+                          "actions": {
+                            "Call_Email_Notifier_Escalation": {
+                              "type": "Http",
+                              "runAfter": {},
+                              "inputs": {
+                                "method": "POST",
+                                "uri": "@parameters('emailNotifierUrl')",
+                                "headers": {
+                                  "Content-Type": "application/json",
+                                  "x-correlation-id": "@triggerBody()?['correlationId']"
+                                },
+                                "body": {
+                                  "correlationId": "@triggerBody()?['correlationId']",
+                                  "emailTo": "@item()?['routing']?['escalationGroup']",
+                                  "emailType": "escalation",
+                                  "workItem": "@triggerBody()?['workItem']",
+                                  "ruleId": "@item()?['ruleId']",
+                                  "ruleName": "@item()?['ruleName']",
+                                  "scenarios": "@triggerBody()?['routingResult']?['scenarios']"
+                                },
+                                "retryPolicy": {
+                                  "type": "exponential",
+                                  "count": 3,
+                                  "interval": "PT5S",
+                                  "minimumInterval": "PT5S",
+                                  "maximumInterval": "PT30S"
+                                }
+                              }
+                            }
+                          },
+                          "else": {
+                            "actions": {}
+                          }
+                        },
+                        "Dispatch_Security_Liaison_Email": {
+                          "type": "If",
+                          "runAfter": {
+                            "Dispatch_Escalation_Email": [
+                              "Succeeded",
+                              "Skipped"
+                            ]
+                          },
+                          "expression": {
+                            "and": [
+                              {
+                                "not": {
+                                  "equals": [
+                                    "@item()?['routing']?['securityLiaison']",
+                                    null
+                                  ]
+                                }
+                              },
+                              {
+                                "contains": [
+                                  "@triggerBody()?['routingResult']?['scenarios']",
+                                  "C"
+                                ]
+                              }
+                            ]
+                          },
+                          "actions": {
+                            "Call_Email_Notifier_Security": {
+                              "type": "Http",
+                              "runAfter": {},
+                              "inputs": {
+                                "method": "POST",
+                                "uri": "@parameters('emailNotifierUrl')",
+                                "headers": {
+                                  "Content-Type": "application/json",
+                                  "x-correlation-id": "@triggerBody()?['correlationId']"
+                                },
+                                "body": {
+                                  "correlationId": "@triggerBody()?['correlationId']",
+                                  "emailTo": "@item()?['routing']?['securityLiaison']",
+                                  "emailType": "security-liaison",
+                                  "workItem": "@triggerBody()?['workItem']",
+                                  "ruleId": "@item()?['ruleId']",
+                                  "ruleName": "@item()?['ruleName']",
+                                  "scenarios": "@triggerBody()?['routingResult']?['scenarios']"
+                                },
+                                "retryPolicy": {
+                                  "type": "exponential",
+                                  "count": 3,
+                                  "interval": "PT5S",
+                                  "minimumInterval": "PT5S",
+                                  "maximumInterval": "PT30S"
+                                }
+                              }
+                            }
+                          },
+                          "else": {
+                            "actions": {}
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {
+                      "Log_No_Rules_Matched": {
+                        "type": "Compose",
+                        "runAfter": {},
+                        "inputs": {
+                          "correlationId": "@triggerBody()?['correlationId']",
+                          "message": "No routing rules matched for this work item — no notifications sent",
+                          "workItemId": "@triggerBody()?['workItem']?['workItemId']"
+                        }
+                      }
+                    }
+                  }
+                },
+                "Return_Dispatch_Response": {
+                  "type": "Response",
+                  "kind": "Http",
+                  "runAfter": {
+                    "Check_Has_Routing_Decisions": [
+                      "Succeeded",
+                      "Failed",
+                      "Skipped"
+                    ]
+                  },
+                  "inputs": {
+                    "statusCode": 200,
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "correlationId": "@triggerBody()?['correlationId']",
+                      "status": "dispatched",
+                      "matchedRuleCount": "@triggerBody()?['routingResult']?['matchedRuleCount']",
+                      "scenarios": "@triggerBody()?['routingResult']?['scenarios']",
+                      "timestamp": "@utcNow()"
+                    }
+                  }
+                }
+              },
+              "outputs": {}
+            },
+            "$fxv#3": {
+              "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+              "contentVersion": "1.0.0.0",
+              "parameters": {
+                "storageAccountName": {
+                  "type": "string",
+                  "metadata": {
+                    "description": "Azure Storage Account name hosting routing-rules.json in the routing-rules container"
+                  }
+                },
+                "dispatcherCallbackUrl": {
+                  "type": "securestring",
+                  "metadata": {
+                    "description": "HTTP trigger URL of the Dispatcher Logic App"
+                  }
+                },
+                "webhookSharedSecret": {
+                  "type": "securestring",
+                  "metadata": {
+                    "description": "Shared secret sent by Azure DevOps in x-webhook-secret header"
+                  }
+                },
+                "correlationIdPrefix": {
+                  "type": "string",
+                  "defaultValue": "NOTIF",
+                  "metadata": {
+                    "description": "Prefix for generated correlation IDs"
+                  }
+                }
+              },
+              "triggers": {
+                "Receive_WorkItem_Webhook": {
+                  "type": "Request",
+                  "kind": "Http",
+                  "inputs": {
+                    "method": "POST",
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "eventType": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "object",
+                          "properties": {
+                            "text": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "resource": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "workItemType": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "state": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string"
+                            },
+                            "fields": {
+                              "type": "object"
+                            }
+                          }
+                        },
+                        "resourceContainers": {
+                          "type": "object",
+                          "properties": {
+                            "project": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "actions": {
+                "Scope_Main_Processing": {
+                  "type": "Scope",
+                  "runAfter": {},
+                  "actions": {
+                    "Initialize_CorrelationId": {
+                      "type": "InitializeVariable",
+                      "runAfter": {},
+                      "inputs": {
+                        "variables": [
+                          {
+                            "name": "correlationId",
+                            "type": "string",
+                            "value": "@{concat(parameters('correlationIdPrefix'), '-', utcNow('yyyyMMddHHmmss'), '-', substring(guid(), 0, 8))}"
+                          }
+                        ]
+                      }
+                    },
+                    "Initialize_ProcessingStatus": {
+                      "type": "InitializeVariable",
+                      "runAfter": {
+                        "Initialize_CorrelationId": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "variables": [
+                          {
+                            "name": "processingStatus",
+                            "type": "string",
+                            "value": "processing"
+                          }
+                        ]
+                      }
+                    },
+                    "Validate_Webhook_Secret": {
+                      "type": "If",
+                      "runAfter": {
+                        "Initialize_ProcessingStatus": [
+                          "Succeeded"
+                        ]
+                      },
+                      "expression": {
+                        "equals": [
+                          "@triggerOutputs()?['headers']?['x-webhook-secret']",
+                          "@parameters('webhookSharedSecret')"
+                        ]
+                      },
+                      "actions": {
+                        "Check_Supported_Event_Type": {
+                          "type": "If",
+                          "runAfter": {},
+                          "expression": {
+                            "or": [
+                              {
+                                "equals": [
+                                  "@triggerBody()?['eventType']",
+                                  "workitem.created"
+                                ]
+                              },
+                              {
+                                "equals": [
+                                  "@triggerBody()?['eventType']",
+                                  "workitem.updated"
+                                ]
+                              }
+                            ]
+                          },
+                          "actions": {
+                            "Compose_WorkItem_Fields": {
+                              "type": "Compose",
+                              "runAfter": {},
+                              "inputs": {
+                                "correlationId": "@variables('correlationId')",
+                                "eventType": "@triggerBody()?['eventType']",
+                                "workItemId": "@triggerBody()?['resource']?['id']",
+                                "workItemUrl": "@triggerBody()?['resource']?['url']",
+                                "title": "@coalesce(triggerBody()?['resource']?['fields']?['System.Title'], triggerBody()?['resource']?['title'], '')",
+                                "state": "@coalesce(triggerBody()?['resource']?['fields']?['System.State'], triggerBody()?['resource']?['state'], '')",
+                                "workItemType": "@coalesce(triggerBody()?['resource']?['fields']?['System.WorkItemType'], triggerBody()?['resource']?['workItemType'], 'Unknown')",
+                                "teamProject": "@coalesce(triggerBody()?['resourceContainers']?['project']?['name'], '')",
+                                "areaPath": "@coalesce(triggerBody()?['resource']?['fields']?['System.AreaPath'], '')",
+                                "assignedTo": "@coalesce(triggerBody()?['resource']?['fields']?['System.AssignedTo'], '')",
+                                "priority": "@string(coalesce(triggerBody()?['resource']?['fields']?['Microsoft.VSTS.Common.Priority'], 4))",
+                                "product": "@coalesce(triggerBody()?['resource']?['fields']?['Custom.Product'], 'Unknown')",
+                                "productFamily": "@coalesce(triggerBody()?['resource']?['fields']?['Custom.ProductFamily'], '')",
+                                "isCyberSecurity": "@coalesce(triggerBody()?['resource']?['fields']?['Custom.IsCyberSecurity'], false)",
+                                "isHotfix": "@coalesce(triggerBody()?['resource']?['fields']?['Custom.IsHotfix'], false)",
+                                "adoEventId": "@coalesce(triggerBody()?['id'], guid())"
+                              }
+                            },
+                            "Load_Routing_Rules": {
+                              "type": "Http",
+                              "runAfter": {
+                                "Compose_WorkItem_Fields": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "inputs": {
+                                "method": "GET",
+                                "uri": "https://@{parameters('storageAccountName')}.blob.core.windows.net/routing-rules/routing-rules.json",
+                                "authentication": {
+                                  "type": "ManagedServiceIdentity",
+                                  "audience": "https://storage.azure.com/"
+                                },
+                                "retryPolicy": {
+                                  "type": "exponential",
+                                  "count": 3,
+                                  "interval": "PT5S",
+                                  "minimumInterval": "PT5S",
+                                  "maximumInterval": "PT30S"
+                                }
+                              }
+                            },
+                            "Filter_Matching_Rules": {
+                              "type": "Query",
+                              "runAfter": {
+                                "Load_Routing_Rules": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "inputs": {
+                                "from": "@body('Load_Routing_Rules')?['rules']",
+                                "where": "@and(equals(item()?['enabled'], true), or(empty(string(coalesce(item()?['conditions']?['product'], ''))), equals(toLower(string(coalesce(item()?['conditions']?['product'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['product'], ''))))), or(empty(string(coalesce(item()?['conditions']?['priority'], ''))), equals(string(coalesce(item()?['conditions']?['priority'], '')), string(coalesce(outputs('Compose_WorkItem_Fields')?['priority'], '')))), or(empty(string(coalesce(item()?['conditions']?['areaPath'], ''))), contains(toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['areaPath'], ''))), toLower(string(coalesce(item()?['conditions']?['areaPath'], ''))))), or(empty(string(coalesce(item()?['conditions']?['workItemType'], ''))), equals(toLower(string(coalesce(item()?['conditions']?['workItemType'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['workItemType'], ''))))), or(not(equals(item()?['conditions']?['isCyberSecurity'], true)), equals(coalesce(outputs('Compose_WorkItem_Fields')?['isCyberSecurity'], false), true)), or(not(equals(item()?['conditions']?['isHotfix'], true)), equals(coalesce(outputs('Compose_WorkItem_Fields')?['isHotfix'], false), true)))"
+                              }
+                            },
+                            "Select_Routing_Decisions": {
+                              "type": "Select",
+                              "runAfter": {
+                                "Filter_Matching_Rules": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "inputs": {
+                                "from": "@body('Filter_Matching_Rules')",
+                                "select": {
+                                  "ruleId": "@item()?['id']",
+                                  "ruleName": "@item()?['name']",
+                                  "routing": "@item()?['routing']"
+                                }
+                              }
+                            },
+                            "Compose_Routing_Result": {
+                              "type": "Compose",
+                              "runAfter": {
+                                "Select_Routing_Decisions": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "inputs": {
+                                "matchedRuleCount": "@length(body('Filter_Matching_Rules'))",
+                                "routingDecisions": "@body('Select_Routing_Decisions')",
+                                "scenarios": "@createArray('scenarioA')"
+                              }
+                            },
+                            "Call_Dispatcher": {
+                              "type": "Http",
+                              "runAfter": {
+                                "Compose_Routing_Result": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "inputs": {
+                                "method": "POST",
+                                "uri": "@parameters('dispatcherCallbackUrl')",
+                                "headers": {
+                                  "Content-Type": "application/json",
+                                  "x-correlation-id": "@variables('correlationId')"
+                                },
+                                "body": {
+                                  "correlationId": "@variables('correlationId')",
+                                  "workItem": "@outputs('Compose_WorkItem_Fields')",
+                                  "routingResult": "@outputs('Compose_Routing_Result')"
+                                },
+                                "retryPolicy": {
+                                  "type": "exponential",
+                                  "count": 3,
+                                  "interval": "PT10S",
+                                  "minimumInterval": "PT10S",
+                                  "maximumInterval": "PT2M"
+                                }
+                              }
+                            },
+                            "Set_Status_Dispatched": {
+                              "type": "SetVariable",
+                              "runAfter": {
+                                "Call_Dispatcher": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "inputs": {
+                                "name": "processingStatus",
+                                "value": "dispatched"
+                              }
+                            }
+                          },
+                          "else": {
+                            "actions": {
+                              "Set_Status_Skipped_Event": {
+                                "type": "SetVariable",
+                                "runAfter": {},
+                                "inputs": {
+                                  "name": "processingStatus",
+                                  "value": "@{concat('skipped-unsupported-event:', triggerBody()?['eventType'])}"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "else": {
+                        "actions": {
+                          "Set_Status_Unauthorized": {
+                            "type": "SetVariable",
+                            "runAfter": {},
+                            "inputs": {
+                              "name": "processingStatus",
+                              "value": "rejected-invalid-secret"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "Scope_Error_Handler": {
+                  "type": "Scope",
+                  "runAfter": {
+                    "Scope_Main_Processing": [
+                      "Failed",
+                      "TimedOut"
+                    ]
+                  },
+                  "actions": {
+                    "Compose_Error_Details": {
+                      "type": "Compose",
+                      "runAfter": {},
+                      "inputs": {
+                        "correlationId": "@variables('correlationId')",
+                        "timestamp": "@utcNow()",
+                        "workItemId": "@triggerBody()?['resource']?['id']",
+                        "eventType": "@triggerBody()?['eventType']",
+                        "scopeResult": "@result('Scope_Main_Processing')",
+                        "message": "Orchestrator encountered an unhandled error during processing"
+                      }
+                    },
+                    "Set_Status_Failed": {
+                      "type": "SetVariable",
+                      "runAfter": {
+                        "Compose_Error_Details": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "name": "processingStatus",
+                        "value": "failed"
+                      }
+                    }
+                  }
+                },
+                "Return_Acknowledgement": {
+                  "type": "Response",
+                  "kind": "Http",
+                  "runAfter": {
+                    "Scope_Error_Handler": [
+                      "Succeeded",
+                      "Skipped"
+                    ]
+                  },
+                  "inputs": {
+                    "statusCode": 200,
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "correlationId": "@variables('correlationId')",
+                      "status": "@variables('processingStatus')",
+                      "workItemId": "@triggerBody()?['resource']?['id']",
+                      "eventType": "@triggerBody()?['eventType']",
+                      "timestamp": "@utcNow()"
+                    }
+                  }
+                }
+              },
+              "outputs": {}
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Logic/workflows",
+              "apiVersion": "2019-05-01",
+              "name": "[parameters('teamsNotifierLaName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "state": "Enabled",
+                "definition": "[variables('$fxv#0')]",
+                "parameters": {}
+              }
+            },
+            {
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[format('Microsoft.Logic/workflows/{0}', parameters('teamsNotifierLaName'))]",
+              "name": "[format('diag-{0}', parameters('teamsNotifierLaName'))]",
+              "properties": {
+                "workspaceId": "[parameters('logAnalyticsWorkspaceId')]",
+                "logs": [
+                  {
+                    "category": "WorkflowRuntime",
+                    "enabled": true
+                  }
+                ],
+                "metrics": [
+                  {
+                    "category": "AllMetrics",
+                    "enabled": true
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Logic/workflows', parameters('teamsNotifierLaName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Logic/workflows",
+              "apiVersion": "2019-05-01",
+              "name": "[parameters('emailNotifierLaName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "state": "Enabled",
+                "definition": "[variables('$fxv#1')]",
+                "parameters": {
+                  "sendGridApiKey": {
+                    "value": "[parameters('sendGridApiKey')]"
+                  },
+                  "emailFromAddress": {
+                    "value": "[parameters('notificationFromEmail')]"
+                  },
+                  "emailFromName": {
+                    "value": "Azure DevOps Notifications"
+                  },
+                  "adoBaseUrl": {
+                    "value": "[parameters('adoOrganisationUrl')]"
+                  }
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[format('Microsoft.Logic/workflows/{0}', parameters('emailNotifierLaName'))]",
+              "name": "[format('diag-{0}', parameters('emailNotifierLaName'))]",
+              "properties": {
+                "workspaceId": "[parameters('logAnalyticsWorkspaceId')]",
+                "logs": [
+                  {
+                    "category": "WorkflowRuntime",
+                    "enabled": true
+                  }
+                ],
+                "metrics": [
+                  {
+                    "category": "AllMetrics",
+                    "enabled": true
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Logic/workflows', parameters('emailNotifierLaName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Logic/workflows",
+              "apiVersion": "2019-05-01",
+              "name": "[parameters('dispatcherLaName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "state": "Enabled",
+                "definition": "[variables('$fxv#2')]",
+                "parameters": {
+                  "teamsNotifierUrl": {
+                    "value": "[listCallbackUrl(format('{0}/triggers/Receive_Teams_Notification_Request', resourceId('Microsoft.Logic/workflows', parameters('teamsNotifierLaName'))), '2019-05-01').value]"
+                  },
+                  "emailNotifierUrl": {
+                    "value": "[listCallbackUrl(format('{0}/triggers/Receive_Email_Notification_Request', resourceId('Microsoft.Logic/workflows', parameters('emailNotifierLaName'))), '2019-05-01').value]"
+                  }
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Logic/workflows', parameters('emailNotifierLaName'))]",
+                "[resourceId('Microsoft.Logic/workflows', parameters('teamsNotifierLaName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[format('Microsoft.Logic/workflows/{0}', parameters('dispatcherLaName'))]",
+              "name": "[format('diag-{0}', parameters('dispatcherLaName'))]",
+              "properties": {
+                "workspaceId": "[parameters('logAnalyticsWorkspaceId')]",
+                "logs": [
+                  {
+                    "category": "WorkflowRuntime",
+                    "enabled": true
+                  }
+                ],
+                "metrics": [
+                  {
+                    "category": "AllMetrics",
+                    "enabled": true
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Logic/workflows', parameters('dispatcherLaName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Logic/workflows",
+              "apiVersion": "2019-05-01",
+              "name": "[parameters('orchestratorLaName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "state": "Enabled",
+                "definition": "[variables('$fxv#3')]",
+                "parameters": {
+                  "storageAccountName": {
+                    "value": "[parameters('storageAccountName')]"
+                  },
+                  "dispatcherCallbackUrl": {
+                    "value": "[listCallbackUrl(format('{0}/triggers/Receive_Dispatch_Request', resourceId('Microsoft.Logic/workflows', parameters('dispatcherLaName'))), '2019-05-01').value]"
+                  },
+                  "webhookSharedSecret": {
+                    "value": "[parameters('webhookSharedSecret')]"
+                  },
+                  "correlationIdPrefix": {
+                    "value": "NOTIF"
+                  }
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Logic/workflows', parameters('dispatcherLaName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[format('Microsoft.Logic/workflows/{0}', parameters('orchestratorLaName'))]",
+              "name": "[format('diag-{0}', parameters('orchestratorLaName'))]",
+              "properties": {
+                "workspaceId": "[parameters('logAnalyticsWorkspaceId')]",
+                "logs": [
+                  {
+                    "category": "WorkflowRuntime",
+                    "enabled": true
+                  }
+                ],
+                "metrics": [
+                  {
+                    "category": "AllMetrics",
+                    "enabled": true
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Logic/workflows', parameters('orchestratorLaName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "orchestratorEndpoint": {
+              "type": "string",
+              "value": "[listCallbackUrl(format('{0}/triggers/Receive_WorkItem_Webhook', resourceId('Microsoft.Logic/workflows', parameters('orchestratorLaName'))), '2019-05-01').value]"
+            },
+            "dispatcherEndpoint": {
+              "type": "string",
+              "value": "[listCallbackUrl(format('{0}/triggers/Receive_Dispatch_Request', resourceId('Microsoft.Logic/workflows', parameters('dispatcherLaName'))), '2019-05-01').value]"
+            },
+            "logicAppPrincipalIds": {
+              "type": "array",
+              "value": [
+                "[reference(resourceId('Microsoft.Logic/workflows', parameters('orchestratorLaName')), '2019-05-01', 'full').identity.principalId]",
+                "[reference(resourceId('Microsoft.Logic/workflows', parameters('dispatcherLaName')), '2019-05-01', 'full').identity.principalId]",
+                "[reference(resourceId('Microsoft.Logic/workflows', parameters('teamsNotifierLaName')), '2019-05-01', 'full').identity.principalId]",
+                "[reference(resourceId('Microsoft.Logic/workflows', parameters('emailNotifierLaName')), '2019-05-01', 'full').identity.principalId]"
+              ]
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', format('appinsights-{0}', parameters('environmentName')))]",
+        "[resourceId('Microsoft.Resources/deployments', format('keyvault-{0}', parameters('environmentName')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('la-storage-rbac-{0}', parameters('environmentName'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "principalIds": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', format('logicapps-{0}', parameters('environmentName'))), '2025-04-01').outputs.logicAppPrincipalIds.value]"
+          },
+          "storageAccountId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', format('storage-{0}', parameters('environmentName'))), '2025-04-01').outputs.storageAccountId.value]"
+          },
+          "roleName": {
+            "value": "Storage Blob Data Reader"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.39.26.7824",
+              "templateHash": "4466449979637127184"
+            }
+          },
+          "parameters": {
+            "principalId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Principal ID of the resource receiving the role assignment"
+              }
+            },
+            "principalIds": {
+              "type": "array",
+              "defaultValue": [],
+              "metadata": {
+                "description": "Array of principal IDs (when assigning to multiple principals)"
+              }
+            },
+            "storageAccountId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Storage Account resource ID (when assigning storage roles)"
+              }
+            },
+            "keyVaultId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Key Vault resource ID (when assigning Key Vault roles)"
+              }
+            },
+            "roleName": {
+              "type": "string",
+              "allowedValues": [
+                "Storage Blob Data Reader",
+                "Storage Blob Data Contributor",
+                "Key Vault Secrets User",
+                "Key Vault Secrets Officer"
+              ],
+              "metadata": {
+                "description": "Role name to assign"
+              }
+            }
+          },
+          "variables": {
+            "roleDefinitionIds": {
+              "Storage Blob Data Reader": "2a2b9908-6ea1-4ae2-8e65-a410df84e7d1",
+              "Storage Blob Data Contributor": "ba92f5b4-2d11-453d-a403-e96b0029c9fe",
+              "Key Vault Secrets User": "4633458b-17de-408a-b874-0445c86b69e6",
+              "Key Vault Secrets Officer": "b86a8fe4-44ce-4948-aee5-eccb2c155cd7"
+            },
+            "targetResourceId": "[if(not(empty(parameters('storageAccountId'))), parameters('storageAccountId'), parameters('keyVaultId'))]",
+            "effectivePrincipalIds": "[if(not(empty(parameters('principalId'))), createArray(parameters('principalId')), parameters('principalIds'))]"
+          },
+          "resources": [
+            {
+              "copy": {
+                "name": "roleAssignments",
+                "count": "[length(variables('effectivePrincipalIds'))]"
+              },
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "name": "[guid(variables('targetResourceId'), variables('effectivePrincipalIds')[copyIndex()], variables('roleDefinitionIds')[parameters('roleName')])]",
+              "properties": {
+                "roleDefinitionId": "[resourceId('Microsoft.Authorization/roleDefinitions', variables('roleDefinitionIds')[parameters('roleName')])]",
+                "principalId": "[variables('effectivePrincipalIds')[copyIndex()]]",
+                "principalType": "ServicePrincipal"
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', format('logicapps-{0}', parameters('environmentName')))]",
+        "[resourceId('Microsoft.Resources/deployments', format('storage-{0}', parameters('environmentName')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('la-kv-rbac-{0}', parameters('environmentName'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "principalIds": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', format('logicapps-{0}', parameters('environmentName'))), '2025-04-01').outputs.logicAppPrincipalIds.value]"
+          },
+          "keyVaultId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', format('keyvault-{0}', parameters('environmentName'))), '2025-04-01').outputs.keyVaultId.value]"
+          },
+          "roleName": {
+            "value": "Key Vault Secrets User"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.39.26.7824",
+              "templateHash": "4466449979637127184"
+            }
+          },
+          "parameters": {
+            "principalId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Principal ID of the resource receiving the role assignment"
+              }
+            },
+            "principalIds": {
+              "type": "array",
+              "defaultValue": [],
+              "metadata": {
+                "description": "Array of principal IDs (when assigning to multiple principals)"
+              }
+            },
+            "storageAccountId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Storage Account resource ID (when assigning storage roles)"
+              }
+            },
+            "keyVaultId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Key Vault resource ID (when assigning Key Vault roles)"
+              }
+            },
+            "roleName": {
+              "type": "string",
+              "allowedValues": [
+                "Storage Blob Data Reader",
+                "Storage Blob Data Contributor",
+                "Key Vault Secrets User",
+                "Key Vault Secrets Officer"
+              ],
+              "metadata": {
+                "description": "Role name to assign"
+              }
+            }
+          },
+          "variables": {
+            "roleDefinitionIds": {
+              "Storage Blob Data Reader": "2a2b9908-6ea1-4ae2-8e65-a410df84e7d1",
+              "Storage Blob Data Contributor": "ba92f5b4-2d11-453d-a403-e96b0029c9fe",
+              "Key Vault Secrets User": "4633458b-17de-408a-b874-0445c86b69e6",
+              "Key Vault Secrets Officer": "b86a8fe4-44ce-4948-aee5-eccb2c155cd7"
+            },
+            "targetResourceId": "[if(not(empty(parameters('storageAccountId'))), parameters('storageAccountId'), parameters('keyVaultId'))]",
+            "effectivePrincipalIds": "[if(not(empty(parameters('principalId'))), createArray(parameters('principalId')), parameters('principalIds'))]"
+          },
+          "resources": [
+            {
+              "copy": {
+                "name": "roleAssignments",
+                "count": "[length(variables('effectivePrincipalIds'))]"
+              },
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "name": "[guid(variables('targetResourceId'), variables('effectivePrincipalIds')[copyIndex()], variables('roleDefinitionIds')[parameters('roleName')])]",
+              "properties": {
+                "roleDefinitionId": "[resourceId('Microsoft.Authorization/roleDefinitions', variables('roleDefinitionIds')[parameters('roleName')])]",
+                "principalId": "[variables('effectivePrincipalIds')[copyIndex()]]",
+                "principalType": "ServicePrincipal"
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', format('keyvault-{0}', parameters('environmentName')))]",
+        "[resourceId('Microsoft.Resources/deployments', format('logicapps-{0}', parameters('environmentName')))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "orchestratorTriggerEndpoint": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', format('logicapps-{0}', parameters('environmentName'))), '2025-04-01').outputs.orchestratorEndpoint.value]"
+    },
+    "dispatcherTriggerEndpoint": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', format('logicapps-{0}', parameters('environmentName'))), '2025-04-01').outputs.dispatcherEndpoint.value]"
+    },
+    "storageAccountName": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', format('storage-{0}', parameters('environmentName'))), '2025-04-01').outputs.storageAccountName.value]"
+    },
+    "keyVaultName": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', format('keyvault-{0}', parameters('environmentName'))), '2025-04-01').outputs.keyVaultName.value]"
+    },
+    "appInsightsName": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', format('appinsights-{0}', parameters('environmentName'))), '2025-04-01').outputs.appInsightsName.value]"
+    }
+  }
+}

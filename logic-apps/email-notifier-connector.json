@@ -1,0 +1,104 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    }
+  },
+  "triggers": {
+    "Receive_Email_Notification_Request": {
+      "type": "Request",
+      "kind": "Http",
+      "inputs": {
+        "method": "POST",
+        "schema": {
+          "type": "object",
+          "required": ["correlationId", "emailTo", "emailType", "workItem"],
+          "properties": {
+            "correlationId": { "type": "string" },
+            "emailTo":       { "type": "string" },
+            "emailType":     { "type": "string" },
+            "ruleId":        { "type": "string" },
+            "ruleName":      { "type": "string" },
+            "workItem": {
+              "type": "object",
+              "properties": {
+                "workItemId":    {},
+                "workItemUrl":   { "type": "string" },
+                "title":         { "type": "string" },
+                "state":         { "type": "string" },
+                "workItemType":  { "type": "string" },
+                "teamProject":   { "type": "string" },
+                "areaPath":      { "type": "string" },
+                "assignedTo":    { "type": "string" },
+                "priority":      { "type": "string" },
+                "product":       { "type": "string" },
+                "isCyberSecurity": {},
+                "isHotfix":      {},
+                "eventType":     { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "actions": {
+    "Compose_Email_Subject": {
+      "type": "Compose",
+      "runAfter": {},
+      "inputs": "@concat('[', triggerBody()?['workItem']?['priority'], '] ', triggerBody()?['workItem']?['workItemType'], ' #', triggerBody()?['workItem']?['workItemId'], ' — ', triggerBody()?['workItem']?['title'], ' [', triggerBody()?['workItem']?['teamProject'], ']')"
+    },
+    "Compose_Email_Body": {
+      "type": "Compose",
+      "runAfter": {
+        "Compose_Email_Subject": [ "Succeeded" ]
+      },
+      "inputs": "@concat('<!DOCTYPE html><html><body style=\"font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#323130;\"><h2 style=\"color:#0078D4;\">Azure DevOps Work Item ', if(equals(triggerBody()?['workItem']?['eventType'], 'workitem.created'), 'Created', 'Updated'), '</h2><table cellpadding=\"8\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%;max-width:600px;\"><tr style=\"background:#f3f2f1;\"><td style=\"width:160px;\"><b>Work Item</b></td><td><a href=\"', triggerBody()?['workItem']?['workItemUrl'], '\" style=\"color:#0078D4;text-decoration:none;\">', triggerBody()?['workItem']?['workItemType'], ' #', triggerBody()?['workItem']?['workItemId'], ' &mdash; ', triggerBody()?['workItem']?['title'], '</a></td></tr><tr><td><b>Project</b></td><td>', triggerBody()?['workItem']?['teamProject'], '</td></tr><tr style=\"background:#f3f2f1;\"><td><b>State</b></td><td>', triggerBody()?['workItem']?['state'], '</td></tr><tr><td><b>Priority</b></td><td>', triggerBody()?['workItem']?['priority'], '</td></tr><tr style=\"background:#f3f2f1;\"><td><b>Product</b></td><td>', coalesce(triggerBody()?['workItem']?['product'], 'N/A'), '</td></tr><tr><td><b>Area Path</b></td><td>', triggerBody()?['workItem']?['areaPath'], '</td></tr><tr style=\"background:#f3f2f1;\"><td><b>Assigned To</b></td><td>', coalesce(triggerBody()?['workItem']?['assignedTo'], 'Unassigned'), '</td></tr><tr><td><b>Routing Rule</b></td><td>[', triggerBody()?['ruleId'], '] ', triggerBody()?['ruleName'], '</td></tr><tr style=\"background:#f3f2f1;\"><td><b>Correlation ID</b></td><td><small>', triggerBody()?['correlationId'], '</small></td></tr></table><br/><p><a href=\"', triggerBody()?['workItem']?['workItemUrl'], '\" style=\"background:#0078D4;color:#fff;padding:8px 16px;text-decoration:none;border-radius:4px;\">Open in Azure DevOps</a></p><hr style=\"border:none;border-top:1px solid #edebe9;margin-top:24px;\"/><p style=\"font-size:11px;color:#605e5c;\">Sent by AVEVA Notification Service &bull; Correlation ID: ', triggerBody()?['correlationId'], '</p></body></html>')"
+    },
+    "Send_Email": {
+      "type": "ApiConnection",
+      "runAfter": {
+        "Compose_Email_Body": [ "Succeeded" ]
+      },
+      "inputs": {
+        "host": {
+          "connection": {
+            "name": "@parameters('$connections')['office365']['connectionId']"
+          }
+        },
+        "method": "post",
+        "path": "/v2/Mail",
+        "body": {
+          "To": "@triggerBody()?['emailTo']",
+          "Subject": "@outputs('Compose_Email_Subject')",
+          "Body": "@outputs('Compose_Email_Body')",
+          "Importance": "@if(or(equals(triggerBody()?['workItem']?['priority'], 'P1'), equals(triggerBody()?['workItem']?['priority'], 'P2')), 'High', 'Normal')",
+          "IsHtml": true
+        }
+      }
+    },
+    "Return_Email_Response": {
+      "type": "Response",
+      "kind": "Http",
+      "runAfter": {
+        "Send_Email": [ "Succeeded", "Failed" ]
+      },
+      "inputs": {
+        "statusCode": "@if(equals(actions('Send_Email').status, 'Succeeded'), 200, 502)",
+        "headers": { "Content-Type": "application/json" },
+        "body": {
+          "correlationId": "@triggerBody()?['correlationId']",
+          "channel": "EmailConnector",
+          "emailType": "@triggerBody()?['emailType']",
+          "emailTo": "@triggerBody()?['emailTo']",
+          "status": "@if(equals(actions('Send_Email').status, 'Succeeded'), 'sent', 'failed')",
+          "timestamp": "@utcNow()"
+        }
+      }
+    }
+  },
+  "outputs": {}
+}

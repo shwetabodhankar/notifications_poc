@@ -1,0 +1,186 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://company.com/schemas/routing-rules-v2.json",
+  "title": "Notification Routing Rules",
+  "description": "Schema for the Azure Logic Apps notification routing rules configuration file",
+  "type": "object",
+  "required": ["version", "rules"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$",
+      "description": "Schema version in major.minor format"
+    },
+    "lastModified": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "lastModifiedBy": {
+      "type": "string",
+      "format": "email"
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/Rule"
+      }
+    }
+  },
+  "definitions": {
+    "Rule": {
+      "type": "object",
+      "required": ["id", "priority", "name", "enabled", "conditions", "routing"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^rule-\\d{3,}$",
+          "description": "Unique rule identifier, format: rule-NNN"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9999,
+          "description": "Evaluation order; lower number = higher precedence"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 200
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "effectiveFrom": {
+          "oneOf": [
+            { "type": "string", "format": "date-time" },
+            { "type": "null" }
+          ]
+        },
+        "effectiveTo": {
+          "oneOf": [
+            { "type": "string", "format": "date-time" },
+            { "type": "null" }
+          ]
+        },
+        "conditions": {
+          "$ref": "#/definitions/Conditions"
+        },
+        "routing": {
+          "$ref": "#/definitions/Routing"
+        }
+      }
+    },
+    "Conditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "All fields are optional. Null or 'Any' values act as wildcards.",
+      "properties": {
+        "product": {
+          "oneOf": [
+            { "type": "string", "minLength": 1 },
+            { "type": "null" }
+          ],
+          "description": "Product name (e.g. Ampla, InTouch) or 'Any' for wildcard"
+        },
+        "productFamily": {
+          "oneOf": [
+            { "type": "string", "minLength": 1 },
+            { "type": "null" }
+          ],
+          "description": "Product family name or null for wildcard"
+        },
+        "areaPath": {
+          "oneOf": [
+            { "type": "string", "minLength": 1 },
+            { "type": "null" }
+          ],
+          "description": "Substring match on System.AreaPath or null for wildcard"
+        },
+        "priority": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^(P[1-4]|Any)$",
+              "description": "Priority value: P1, P2, P3, P4, or Any"
+            },
+            { "type": "null" }
+          ]
+        },
+        "workItemType": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["Bug", "Feature", "Task", "Epic", "User Story", "Issue", "Any"]
+            },
+            { "type": "null" }
+          ]
+        },
+        "isCyberSecurity": {
+          "oneOf": [
+            { "type": "boolean" },
+            { "type": "null" }
+          ],
+          "description": "Custom.IsCyberSecurity field value; null = match any"
+        },
+        "isHotfix": {
+          "oneOf": [
+            { "type": "boolean" },
+            { "type": "null" }
+          ],
+          "description": "Custom.IsHotfix field value; null = match any"
+        }
+      }
+    },
+    "Routing": {
+      "type": "object",
+      "required": ["teamsChannelName", "emailGroup"],
+      "additionalProperties": false,
+      "properties": {
+        "teamsChannelName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable Teams channel name for logging"
+        },
+        "teamsChannelWebhookUrl": {
+          "oneOf": [
+            { "type": "string", "format": "uri" },
+            { "type": "null" }
+          ],
+          "description": "Teams incoming webhook URL; null disables Teams notification"
+        },
+        "emailGroup": {
+          "type": "string",
+          "format": "email",
+          "description": "Primary email distribution list"
+        },
+        "escalationGroup": {
+          "oneOf": [
+            { "type": "string", "minLength": 1 },
+            { "type": "null" }
+          ],
+          "description": "Management escalation group name (scenario B); null = no escalation"
+        },
+        "securityLiaison": {
+          "oneOf": [
+            { "type": "string", "format": "email" },
+            { "type": "null" }
+          ],
+          "description": "Security liaison email for cyber security escalations (scenario C)"
+        },
+        "scenarios": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["A", "B", "C"]
+          },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Notification scenarios this rule participates in"
+        }
+      }
+    }
+  }
+}

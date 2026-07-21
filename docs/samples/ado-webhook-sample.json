@@ -1,0 +1,40 @@
+{
+  "id": "a2df63e0-1234-5678-abcd-ef0123456789",
+  "eventType": "workitem.updated",
+  "publisherId": "tfs",
+  "message": {
+    "text": "Bug #4321 (Authentication bypass via session token) changed in AgileProject2"
+  },
+  "resource": {
+    "id": 4321,
+    "workItemType": "Bug",
+    "title": "Authentication bypass via session token",
+    "state": "Active",
+    "url": "https://dev.azure.com/sbodhankar0209/AgileProject/_apis/wit/workItems/4321",
+    "fields": {
+      "System.TeamProject": "AgileProject2",
+      "System.AreaPath": "AgileProject2\\Ampla\\Backend\\Security",
+      "System.WorkItemType": "Bug",
+      "System.State": "Active",
+      "System.Title": "Authentication bypass via session token",
+      "System.AssignedTo": "john.doe@company.com",
+      "Microsoft.VSTS.Common.Priority": 1,
+      "Custom.Product": "Ampla",
+      "Custom.ProductFamily": "SCADA",
+      "Custom.IsCyberSecurity": true,
+      "Custom.IsHotfix": false
+    },
+    "rev": 3
+  },
+  "resourceContainers": {
+    "collection": {
+      "id": "collection-id",
+      "href": "https://dev.azure.com/sbodhankar0209/_apis/"
+    },
+    "project": {
+      "id": "project-guid-1234",
+      "name": "AgileProject2",
+      "href": "https://dev.azure.com/sbodhankar0209/AgileProject"
+    }
+  }
+}

@@ -1,0 +1,340 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "storageAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure Storage Account name hosting routing-rules.json in the routing-rules container"
+      }
+    },
+    "dispatcherCallbackUrl": {
+      "type": "securestring",
+      "metadata": {
+        "description": "HTTP trigger URL of the Dispatcher Logic App"
+      }
+    },
+    "webhookSharedSecret": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Shared secret sent by Azure DevOps in x-webhook-secret header"
+      }
+    },
+    "correlationIdPrefix": {
+      "type": "string",
+      "defaultValue": "NOTIF",
+      "metadata": {
+        "description": "Prefix for generated correlation IDs"
+      }
+    }
+  },
+  "triggers": {
+    "Receive_WorkItem_Webhook": {
+      "type": "Request",
+      "kind": "Http",
+      "inputs": {
+        "method": "POST",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" },
+            "eventType": { "type": "string" },
+            "message": {
+              "type": "object",
+              "properties": {
+                "text": { "type": "string" }
+              }
+            },
+            "resource": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "integer" },
+                "workItemType": { "type": "string" },
+                "title": { "type": "string" },
+                "state": { "type": "string" },
+                "url": { "type": "string" },
+                "fields": { "type": "object" }
+              }
+            },
+            "resourceContainers": {
+              "type": "object",
+              "properties": {
+                "project": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string" },
+                    "name": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "actions": {
+    "Initialize_CorrelationId": {
+      "type": "InitializeVariable",
+      "runAfter": {},
+      "inputs": {
+        "variables": [
+          {
+            "name": "correlationId",
+            "type": "string",
+            "value": "@{concat(parameters('correlationIdPrefix'), '-', utcNow('yyyyMMddHHmmss'), '-', substring(guid(), 0, 8))}"
+          }
+        ]
+      }
+    },
+    "Initialize_ProcessingStatus": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Initialize_CorrelationId": [ "Succeeded" ]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "processingStatus",
+            "type": "string",
+            "value": "processing"
+          }
+        ]
+      }
+    },
+    "Scope_Main_Processing": {
+      "type": "Scope",
+      "runAfter": {
+        "Initialize_ProcessingStatus": [ "Succeeded" ]
+      },
+      "actions": {
+        "Validate_Webhook_Secret": {
+          "type": "If",
+          "runAfter": {},
+          "expression": {
+            "equals": [
+              "@triggerOutputs()?['headers']?['x-webhook-secret']",
+              "@parameters('webhookSharedSecret')"
+            ]
+          },
+          "actions": {
+            "Check_Supported_Event_Type": {
+              "type": "If",
+              "runAfter": {},
+              "expression": {
+                "or": [
+                  {
+                    "equals": [
+                      "@triggerBody()?['eventType']",
+                      "workitem.created"
+                    ]
+                  },
+                  {
+                    "equals": [
+                      "@triggerBody()?['eventType']",
+                      "workitem.updated"
+                    ]
+                  }
+                ]
+              },
+              "actions": {
+                "Compose_WorkItem_Fields": {
+                  "type": "Compose",
+                  "runAfter": {},
+                  "inputs": {
+                    "correlationId": "@variables('correlationId')",
+                    "eventType": "@triggerBody()?['eventType']",
+                    "workItemId": "@coalesce(triggerBody()?['resource']?['workItemId'], triggerBody()?['resource']?['revision']?['id'], triggerBody()?['resource']?['id'])",
+                    "workItemUrl": "@concat('https://dev.azure.com/', split(coalesce(triggerBody()?['resource']?['revision']?['url'], triggerBody()?['resource']?['url'], 'https://dev.azure.com/unknown/'), '/')[3], '/', coalesce(triggerBody()?['resource']?['revision']?['fields']?['System.TeamProject'], triggerBody()?['resourceContainers']?['project']?['name'], ''), '/_workitems/edit/', coalesce(triggerBody()?['resource']?['workItemId'], triggerBody()?['resource']?['revision']?['id'], triggerBody()?['resource']?['id']))",
+                    "title": "@coalesce(triggerBody()?['resource']?['revision']?['fields']?['System.Title'], triggerBody()?['resource']?['fields']?['System.Title'], triggerBody()?['resource']?['title'], '')",
+                    "state": "@coalesce(triggerBody()?['resource']?['revision']?['fields']?['System.State'], triggerBody()?['resource']?['fields']?['System.State'], triggerBody()?['resource']?['state'], '')",
+                    "workItemType": "@coalesce(triggerBody()?['resource']?['revision']?['fields']?['System.WorkItemType'], triggerBody()?['resource']?['fields']?['System.WorkItemType'], triggerBody()?['resource']?['workItemType'], 'Unknown')",
+                    "teamProject": "@coalesce(triggerBody()?['resource']?['revision']?['fields']?['System.TeamProject'], triggerBody()?['resourceContainers']?['project']?['name'], '')",
+                    "areaPath": "@coalesce(triggerBody()?['resource']?['revision']?['fields']?['System.AreaPath'], triggerBody()?['resource']?['fields']?['System.AreaPath'], '')",
+                    "assignedTo": "@{coalesce(triggerBody()?['resource']?['revision']?['fields']?['System.AssignedTo'], triggerBody()?['resource']?['fields']?['System.AssignedTo'], '')}",
+                    "priority": "@concat('P', string(coalesce(triggerBody()?['resource']?['revision']?['fields']?['Microsoft.VSTS.Common.Priority'], triggerBody()?['resource']?['fields']?['Microsoft.VSTS.Common.Priority'], 4)))",
+                    "product": "@coalesce(triggerBody()?['resource']?['revision']?['fields']?['Custom.Product'], triggerBody()?['resource']?['fields']?['Custom.Product'], 'Unknown')",
+                    "productFamily": "@coalesce(triggerBody()?['resource']?['revision']?['fields']?['Custom.ProductFamily'], triggerBody()?['resource']?['fields']?['Custom.ProductFamily'], '')",
+                    "isCyberSecurity": "@coalesce(triggerBody()?['resource']?['revision']?['fields']?['Custom.IsCyberSecurity'], triggerBody()?['resource']?['fields']?['Custom.IsCyberSecurity'], false)",
+                    "isHotfix": "@coalesce(triggerBody()?['resource']?['revision']?['fields']?['Custom.IsHotfix'], triggerBody()?['resource']?['fields']?['Custom.IsHotfix'], false)",
+                    "adoEventId": "@coalesce(triggerBody()?['id'], guid())"
+                  }
+                },
+                "Load_Routing_Rules": {
+                  "type": "Http",
+                  "runAfter": {
+                    "Compose_WorkItem_Fields": [ "Succeeded" ]
+                  },
+                  "inputs": {
+                    "method": "GET",
+                    "uri": "https://@{parameters('storageAccountName')}.blob.core.windows.net/routing-rules/routing-rules.json",
+                    "headers": {
+                      "x-ms-version": "2019-02-02"
+                    },
+                    "authentication": {
+                      "type": "ManagedServiceIdentity",
+                      "audience": "https://storage.azure.com/"
+                    },
+                    "retryPolicy": {
+                      "type": "exponential",
+                      "count": 3,
+                      "interval": "PT5S",
+                      "minimumInterval": "PT5S",
+                      "maximumInterval": "PT30S"
+                    }
+                  }
+                },
+                "Filter_Matching_Rules": {
+                  "type": "Query",
+                  "runAfter": {
+                    "Load_Routing_Rules": [ "Succeeded" ]
+                  },
+                  "inputs": {
+                    "from": "@body('Load_Routing_Rules')?['rules']",
+                    "where": "@and(equals(item()?['enabled'], true), or(empty(string(coalesce(item()?['conditions']?['product'], ''))), equals(toLower(string(coalesce(item()?['conditions']?['product'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['product'], ''))))), or(empty(string(coalesce(item()?['conditions']?['priority'], ''))), equals(toLower(string(coalesce(item()?['conditions']?['priority'], ''))), 'any'), equals(string(coalesce(item()?['conditions']?['priority'], '')), string(coalesce(outputs('Compose_WorkItem_Fields')?['priority'], '')))), or(empty(string(coalesce(item()?['conditions']?['areaPath'], ''))), contains(toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['areaPath'], ''))), toLower(string(coalesce(item()?['conditions']?['areaPath'], ''))))), or(empty(string(coalesce(item()?['conditions']?['workItemType'], ''))), equals(toLower(string(coalesce(item()?['conditions']?['workItemType'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['workItemType'], ''))))), or(not(equals(item()?['conditions']?['isCyberSecurity'], true)), equals(coalesce(outputs('Compose_WorkItem_Fields')?['isCyberSecurity'], false), true)), or(not(equals(item()?['conditions']?['isHotfix'], true)), equals(coalesce(outputs('Compose_WorkItem_Fields')?['isHotfix'], false), true)))"
+                  }
+                },
+                "Select_Routing_Decisions": {
+                  "type": "Select",
+                  "runAfter": {
+                    "Filter_Matching_Rules": [ "Succeeded" ]
+                  },
+                  "inputs": {
+                    "from": "@body('Filter_Matching_Rules')",
+                    "select": {
+                      "ruleId": "@item()?['id']",
+                      "ruleName": "@item()?['name']",
+                      "routing": "@item()?['routing']"
+                    }
+                  }
+                },
+                "Compose_Routing_Result": {
+                  "type": "Compose",
+                  "runAfter": {
+                    "Select_Routing_Decisions": [ "Succeeded" ]
+                  },
+                  "inputs": {
+                    "matchedRuleCount": "@length(body('Filter_Matching_Rules'))",
+                    "routingDecisions": "@body('Select_Routing_Decisions')",
+                    "scenarios": "@createArray('scenarioA')"
+                  }
+                },
+                "Call_Dispatcher": {
+                  "type": "Http",
+                  "runAfter": {
+                    "Compose_Routing_Result": [ "Succeeded" ]
+                  },
+                  "inputs": {
+                    "method": "POST",
+                    "uri": "@parameters('dispatcherCallbackUrl')",
+                    "headers": {
+                      "Content-Type": "application/json",
+                      "x-correlation-id": "@variables('correlationId')"
+                    },
+                    "body": {
+                      "correlationId": "@variables('correlationId')",
+                      "workItem": "@outputs('Compose_WorkItem_Fields')",
+                      "routingResult": "@outputs('Compose_Routing_Result')"
+                    },
+                    "retryPolicy": {
+                      "type": "exponential",
+                      "count": 3,
+                      "interval": "PT10S",
+                      "minimumInterval": "PT10S",
+                      "maximumInterval": "PT2M"
+                    }
+                  }
+                },
+                "Set_Status_Dispatched": {
+                  "type": "SetVariable",
+                  "runAfter": {
+                    "Call_Dispatcher": [ "Succeeded" ]
+                  },
+                  "inputs": {
+                    "name": "processingStatus",
+                    "value": "dispatched"
+                  }
+                }
+              },
+              "else": {
+                "actions": {
+                  "Set_Status_Skipped_Event": {
+                    "type": "SetVariable",
+                    "runAfter": {},
+                    "inputs": {
+                      "name": "processingStatus",
+                      "value": "@{concat('skipped-unsupported-event:', triggerBody()?['eventType'])}"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "actions": {
+              "Set_Status_Unauthorized": {
+                "type": "SetVariable",
+                "runAfter": {},
+                "inputs": {
+                  "name": "processingStatus",
+                  "value": "rejected-invalid-secret"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Scope_Error_Handler": {
+      "type": "Scope",
+      "runAfter": {
+        "Scope_Main_Processing": [ "Failed", "TimedOut" ]
+      },
+      "actions": {
+        "Compose_Error_Details": {
+          "type": "Compose",
+          "runAfter": {},
+          "inputs": {
+            "correlationId": "@variables('correlationId')",
+            "timestamp": "@utcNow()",
+            "workItemId": "@triggerBody()?['resource']?['id']",
+            "eventType": "@triggerBody()?['eventType']",
+            "scopeResult": "@result('Scope_Main_Processing')",
+            "message": "Orchestrator encountered an unhandled error during processing"
+          }
+        },
+        "Set_Status_Failed": {
+          "type": "SetVariable",
+          "runAfter": {
+            "Compose_Error_Details": [ "Succeeded" ]
+          },
+          "inputs": {
+            "name": "processingStatus",
+            "value": "failed"
+          }
+        }
+      }
+    },
+    "Return_Acknowledgement": {
+      "type": "Response",
+      "kind": "Http",
+      "runAfter": {
+        "Initialize_ProcessingStatus": [ "Succeeded" ]
+      },
+      "inputs": {
+        "statusCode": 202,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "correlationId": "@variables('correlationId')",
+          "status": "accepted",
+          "workItemId": "@triggerBody()?['resource']?['id']",
+          "eventType": "@triggerBody()?['eventType']",
+          "timestamp": "@utcNow()"
+        }
+      }
+    }
+  },
+  "outputs": {}
+}

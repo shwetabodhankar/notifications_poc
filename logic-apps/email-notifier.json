@@ -1,0 +1,160 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "sendGridApiKey": {
+      "type": "securestring",
+      "metadata": { "description": "SendGrid API key stored in Key Vault" }
+    },
+    "emailFromAddress": {
+      "type": "string",
+      "defaultValue": "notifications@company.com",
+      "metadata": { "description": "From address for all notification emails" }
+    },
+    "emailFromName": {
+      "type": "string",
+      "defaultValue": "Azure DevOps Notifications",
+      "metadata": { "description": "Friendly from name for notification emails" }
+    },
+    "adoBaseUrl": {
+      "type": "string",
+      "defaultValue": "https://dev.azure.com",
+      "metadata": { "description": "Base URL for Azure DevOps links" }
+    }
+  },
+  "triggers": {
+    "Receive_Email_Notification_Request": {
+      "type": "Request",
+      "kind": "Http",
+      "inputs": {
+        "method": "POST",
+        "schema": {
+          "type": "object",
+          "required": ["correlationId", "emailTo", "emailType", "workItem"],
+          "properties": {
+            "correlationId": { "type": "string" },
+            "emailTo": { "type": "string" },
+            "emailType": {
+              "type": "string",
+              "enum": ["primary", "escalation", "security-liaison"]
+            },
+            "ruleId": { "type": "string" },
+            "ruleName": { "type": "string" },
+            "scenarios": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "workItem": { "type": "object" }
+          }
+        }
+      }
+    }
+  },
+  "actions": {
+    "Determine_Email_Subject_Prefix": {
+      "type": "Compose",
+      "runAfter": {},
+      "inputs": "@if(equals(triggerBody()?['emailType'], 'security-liaison'), '[SECURITY ESCALATION]', if(equals(triggerBody()?['emailType'], 'escalation'), '[P1 ESCALATION]', '[ADO Notification]'))"
+    },
+    "Determine_Priority_Label": {
+      "type": "Compose",
+      "runAfter": {
+        "Determine_Email_Subject_Prefix": [ "Succeeded" ]
+      },
+      "inputs": "@concat('P', triggerBody()?['workItem']?['priority'])"
+    },
+    "Compose_Email_Subject": {
+      "type": "Compose",
+      "runAfter": {
+        "Determine_Priority_Label": [ "Succeeded" ]
+      },
+      "inputs": "@{concat(outputs('Determine_Email_Subject_Prefix'), ' [', outputs('Determine_Priority_Label'), '] ', triggerBody()?['workItem']?['product'], ' — #', triggerBody()?['workItem']?['workItemId'], ': ', triggerBody()?['workItem']?['title'])}"
+    },
+    "Compose_Email_Body_HTML": {
+      "type": "Compose",
+      "runAfter": {
+        "Compose_Email_Subject": [ "Succeeded" ]
+      },
+      "inputs": "@concat(\n  '<!DOCTYPE html><html><head>',\n  '<style>',\n  'body { font-family: Segoe UI, Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }',\n  '.container { max-width: 650px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }',\n  '.header { background: ', if(equals(triggerBody()?['workItem']?['priority'], '1'), '#D83B01', if(equals(triggerBody()?['workItem']?['priority'], '2'), '#E86500', '#0078D4')), '; color: white; padding: 20px 24px; }',\n  '.header h1 { margin: 0; font-size: 18px; }',\n  '.header .subtitle { margin: 4px 0 0; font-size: 13px; opacity: 0.85; }',\n  '.body { padding: 24px; }',\n  '.fact-table { width: 100%; border-collapse: collapse; margin: 16px 0; }',\n  '.fact-table td { padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 14px; }',\n  '.fact-table td:first-child { font-weight: 600; color: #444; width: 130px; }',\n  '.badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 12px; font-weight: 600; }',\n  '.badge-critical { background: #FDE7E9; color: #D83B01; }',\n  '.badge-security { background: #FDE7E9; color: #A4262C; }',\n  '.badge-normal { background: #EFF6FC; color: #0078D4; }',\n  '.cta { margin: 20px 0 0; text-align: center; }',\n  '.cta a { background: #0078D4; color: white; padding: 10px 24px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 600; }',\n  '.footer { padding: 16px 24px; background: #f9f9f9; font-size: 12px; color: #666; border-top: 1px solid #eee; }',\n  '</style></head><body>',\n  '<div class=\"container\">',\n  '<div class=\"header\">',\n  '<h1>Work Item ', if(equals(triggerBody()?['workItem']?['eventType'], 'workitem.created'), 'Created', 'Updated'), '</h1>',\n  '<div class=\"subtitle\">', triggerBody()?['workItem']?['product'], ' | ', triggerBody()?['emailType'], ' notification</div>',\n  '</div>',\n  '<div class=\"body\">',\n  if(contains(triggerBody()?['scenarios'], 'C'), '<p style=\"background:#FDE7E9;border-left:4px solid #A4262C;padding:10px 14px;margin:0 0 16px;\"><strong>⚠ Cyber Security Escalation:</strong> This work item has been flagged as a cyber security issue and requires immediate attention from the security team.</p>', ''),\n  if(contains(triggerBody()?['scenarios'], 'B'), '<p style=\"background:#FEF0CD;border-left:4px solid #E86500;padding:10px 14px;margin:0 0 16px;\"><strong>🚨 P1 Escalation:</strong> This is a Priority 1 item. Management escalation has been triggered.</p>', ''),\n  '<table class=\"fact-table\">',\n  '<tr><td>Work Item ID</td><td>#', triggerBody()?['workItem']?['workItemId'], '</td></tr>',\n  '<tr><td>Title</td><td>', triggerBody()?['workItem']?['title'], '</td></tr>',\n  '<tr><td>Type</td><td>', triggerBody()?['workItem']?['workItemType'], '</td></tr>',\n  '<tr><td>Priority</td><td><span class=\"badge ', if(equals(triggerBody()?['workItem']?['priority'], '1'), 'badge-critical', 'badge-normal'), '\">', outputs('Determine_Priority_Label'), '</span></td></tr>',\n  '<tr><td>State</td><td>', triggerBody()?['workItem']?['state'], '</td></tr>',\n  '<tr><td>Product</td><td>', triggerBody()?['workItem']?['product'], if(empty(triggerBody()?['workItem']?['productFamily']), '', concat(' / ', triggerBody()?['workItem']?['productFamily'])), '</td></tr>',\n  '<tr><td>Area Path</td><td>', triggerBody()?['workItem']?['areaPath'], '</td></tr>',\n  '<tr><td>Project</td><td>', triggerBody()?['workItem']?['teamProject'], '</td></tr>',\n  '<tr><td>Assigned To</td><td>', coalesce(triggerBody()?['workItem']?['assignedTo'], 'Unassigned'), '</td></tr>',\n  if(equals(triggerBody()?['workItem']?['isCyberSecurity'], true), '<tr><td>Cyber Security</td><td><span class=\"badge badge-security\">YES</span></td></tr>', ''),\n  if(equals(triggerBody()?['workItem']?['isHotfix'], true), '<tr><td>Hotfix</td><td><span class=\"badge badge-critical\">YES</span></td></tr>', ''),\n  '<tr><td>Routing Rule</td><td>[', triggerBody()?['ruleId'], '] ', triggerBody()?['ruleName'], '</td></tr>',\n  '<tr><td>Correlation ID</td><td><code style=\"font-size:11px;\">', triggerBody()?['correlationId'], '</code></td></tr>',\n  '</table>',\n  '<div class=\"cta\"><a href=\"', triggerBody()?['workItem']?['workItemUrl'], '\">Open in Azure DevOps</a></div>',\n  '</div>',\n  '<div class=\"footer\">This notification was sent by the Azure Logic Apps Notification Routing System. Do not reply to this email.<br/>',\n  'Notification sent at ', utcNow('R'), '</div>',\n  '</div></body></html>'\n)"
+    },
+    "Send_Email_Via_SendGrid": {
+      "type": "Http",
+      "runAfter": {
+        "Compose_Email_Body_HTML": [ "Succeeded" ]
+      },
+      "inputs": {
+        "method": "POST",
+        "uri": "https://api.sendgrid.com/v3/mail/send",
+        "headers": {
+          "Authorization": "@{concat('Bearer ', parameters('sendGridApiKey'))}",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "personalizations": [
+            {
+              "to": [
+                {
+                  "email": "@triggerBody()?['emailTo']"
+                }
+              ],
+              "subject": "@outputs('Compose_Email_Subject')"
+            }
+          ],
+          "from": {
+            "email": "@parameters('emailFromAddress')",
+            "name": "@parameters('emailFromName')"
+          },
+          "content": [
+            {
+              "type": "text/html",
+              "value": "@outputs('Compose_Email_Body_HTML')"
+            }
+          ],
+          "tracking_settings": {
+            "click_tracking": {
+              "enable": true
+            },
+            "open_tracking": {
+              "enable": true
+            }
+          },
+          "custom_args": {
+            "correlationId": "@triggerBody()?['correlationId']",
+            "ruleId": "@triggerBody()?['ruleId']",
+            "workItemId": "@{triggerBody()?['workItem']?['workItemId']}"
+          }
+        },
+        "retryPolicy": {
+          "type": "exponential",
+          "count": 3,
+          "interval": "PT5S",
+          "minimumInterval": "PT5S",
+          "maximumInterval": "PT30S"
+        }
+      }
+    },
+    "Return_Email_Response": {
+      "type": "Response",
+      "kind": "Http",
+      "runAfter": {
+        "Send_Email_Via_SendGrid": [ "Succeeded", "Failed" ]
+      },
+      "inputs": {
+        "statusCode": "@if(equals(outputs('Send_Email_Via_SendGrid')?['statusCode'], 202), 200, 502)",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "correlationId": "@triggerBody()?['correlationId']",
+          "channel": "Email",
+          "emailTo": "@triggerBody()?['emailTo']",
+          "emailType": "@triggerBody()?['emailType']",
+          "status": "@if(equals(outputs('Send_Email_Via_SendGrid')?['statusCode'], 202), 'sent', 'failed')",
+          "sendGridStatusCode": "@outputs('Send_Email_Via_SendGrid')?['statusCode']",
+          "timestamp": "@utcNow()"
+        }
+      }
+    }
+  },
+  "outputs": {}
+}
