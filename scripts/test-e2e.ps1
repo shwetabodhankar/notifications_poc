@@ -1,6 +1,6 @@
 $url = "https://prod-68.eastus.logic.azure.com:443/workflows/74c48fb29bdd4a97afc11660ca4bebdf/triggers/Receive_WorkItem_Webhook/paths/invoke?api-version=2019-05-01&sp=%2Ftriggers%2FReceive_WorkItem_Webhook%2Frun&sv=1.0&sig=JYl3EdRtZ-WR7Ayb-6cbLoBRkq_cO6oiPZVq-MxhIlw"
 $payload = Get-Content C:\Projects\aveva\notificationspoc\docs\samples\ado-webhook-sample.json -Raw
-$r = Invoke-WebRequest -Method POST -Uri $url -Headers @{ "x-webhook-secret" = "48b13db41b8b929bfec6f8ec64f1cd96" } -ContentType "application/json" -Body $payload
+$r = Invoke-WebRequest -Method POST -Uri $url -Headers @{ "x-webhook-secret" = "" } -ContentType "application/json" -Body $payload
 Write-Host "Orchestrator trigger: HTTP $($r.StatusCode)"
 Write-Host "Waiting 15s for chain to complete..."
 Start-Sleep 15
