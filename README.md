@@ -84,8 +84,13 @@ az account set --subscription "<YOUR_SUBSCRIPTION_ID>"
 .\scripts\deploy.ps1 `
   -Environment dev `
   -ResourceGroup rg-notifpoc-dev `
-  -Location eastus
+  -Location westus `
+  -OwnerTech "technical.owner@aveva.com" `
+  -OwnerBusiness "business.owner@aveva.com" `
+  -Team "<OFFICIAL_TEAM_NAME>"
 ```
+
+`OwnerTech`, `OwnerBusiness`, `CreateDate`, and `team` are required by AVEVA Azure Policy. The script validates the two owner addresses, generates `CreateDate` in `yyyy.MM.dd` format, and applies the same tags to the resource group and deployed resources.
 
 ### 2 — Upload Routing Rules
 
