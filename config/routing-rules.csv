@@ -1,10 +1,6 @@
-id,priority,name,enabled,product,productFamily,areaPath,rulePriority,workItemType,isCyberSecurity,isHotfix,teamsChannelName,teamsChannelWebhookUrl,emailGroup,escalationGroup,securityLiaison,scenarios
-rule-001,10,Ampla — P1 CyberSecurity Escalation,true,Ampla,,Any,P1,,true,,Security-Critical-Ampla,https://company.webhook.office.com/webhookb2/PLACEHOLDER_AMPLA_SECURITY,security-ampla@company.com,CISO-Team,psirt@company.com,"A,B,C"
-rule-002,20,Ampla — P1 Critical (Non-Security),true,Ampla,,Any,P1,,false,,Operations-Critical,https://company.webhook.office.com/webhookb2/PLACEHOLDER_AMPLA_OPS,ops-ampla@company.com,Operations-Managers,,"A,B"
-rule-003,30,Ampla — Standard Routing,true,Ampla,,Any,Any,,,,,Ampla-Engineering,https://company.webhook.office.com/webhookb2/PLACEHOLDER_AMPLA_ENG,engineering-ampla@company.com,,,A
-rule-004,10,InTouch — P1 CyberSecurity Escalation,true,InTouch,HMI,Any,P1,,true,,Security-Critical-HMI,https://company.webhook.office.com/webhookb2/PLACEHOLDER_INTOUCH_SECURITY,security-hmi@company.com,CISO-Team,psirt@company.com,"A,B,C"
-rule-005,30,InTouch — Standard Routing,true,InTouch,HMI,Any,Any,,,,,InTouch-Engineering,https://company.webhook.office.com/webhookb2/PLACEHOLDER_INTOUCH_ENG,engineering-intouch@company.com,,,A
-rule-006,30,Historian — Standard Routing,true,Historian,Data,Any,Any,,,,,Historian-Engineering,https://company.webhook.office.com/webhookb2/PLACEHOLDER_HISTORIAN_ENG,engineering-historian@company.com,,,A
-rule-007,10,Any Product — P1 Hotfix,true,Any,,Any,P1,,,,true,Hotfix-Bridge,https://company.webhook.office.com/webhookb2/PLACEHOLDER_HOTFIX,hotfix-bridge@company.com,Release-Managers,,"A,B"
-rule-008,50,Any Area Path — Security Bug,true,Any,,,Any,Bug,,,Security-Bugs,https://company.webhook.office.com/webhookb2/PLACEHOLDER_SECURITY_BUGS,security-bugs@company.com,,psirt@company.com,A
-rule-999,999,Catch-All — General Support,true,Any,,Any,Any,,,,,General-Support,https://company.webhook.office.com/webhookb2/PLACEHOLDER_GENERAL,support@company.com,,,A
+id,priority,name,enabled,product,productFamily,areaPath,rulePriority,workItemType,isCyberSecurity,isHotfix,teamsChannelName,teamsChannelWebhookUrl,emailGroup,escalationGroup,securityLiaison,scenarios,
+rule-001,10,Ampla  P1 CyberSecurity Escalation,TRUE,Ampla,,Any,P1,,TRUE,,Security-Critical-Ampla,https://company.webhook.office.com/webhookb2/PLACEHOLDER_AMPLA_SECURITY,sbodhankar@microsoft.com,CISO-Team,psirt@company.com,"A,B,C",
+rule-002,20,Ampla  P1 Critical (Non-Security),TRUE,Ampla,,Any,P1,,,,Operations-Critical,https://company.webhook.office.com/webhookb2/PLACEHOLDER_AMPLA_OPS,sbodhankar@microsoft.com,Operations-Managers,,"A,B",
+rule-003,30,Ampla  Standard Routing,TRUE,InTouch,,Any,Any,,TRUE,,,Ampla-Engineering,sbodhankar@microsoft.com,engineering-ampla@company.com,,,A
+rule-004,10,InTouch  P1 CyberSecurity Escalation,TRUE,InTouch,HMI,Any,P1,,FALSE,,Security-Critical-HMI,https://company.webhook.office.com/webhookb2/PLACEHOLDER_INTOUCH_SECURITY,sbodhankar@microsoft.com,CISO-Team,psirt@company.com,"A,B,C",
+rule-999,999,Catch-All  General Support,TRUE,Any,,Any,Any,,,,,General-Support,sbodhankar@microsoft.com,support@company.com,,,A

@@ -22,8 +22,8 @@
       "routing": {
         "teamsChannelName": "Devops-Notifications-Channel",
         "teamsChannelWebhookUrl": "https://defaultc508696dbdfc487ab57b138782c41d.a2.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/351877a1113c4d0c95727c695a9c29c8/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=zTPs7QJ9e0YD3KXYcbO695gfnblrLmVRPC7kFaR4Bqk",
-        "teamsTeamId": "2c72dce3-8aee-4f00-b3ec-27b7743cfa32",
-        "teamsChannelId": "19:TXD14igEZrjLHABefOjPRYbx1_SCEez2uCvVn79O9lU1@thread.tacv2",
+        "teamsTeamId": "a5b3fdd9-4ffb-49a4-916c-15f5aea86fef",
+        "teamsChannelId": "19:NQb2njN0ABU9cqxTnQXgcqrjf9XojzGs2NC9D20cIYM1@thread.tacv2",
         "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com",
         "escalationGroup": "CISO-Team",
         "securityLiaison": "psirt@company.com",
@@ -49,8 +49,8 @@
       "routing": {
         "teamsChannelName": "Operations-Critical",
         "teamsChannelWebhookUrl": "https://company.webhook.office.com/webhookb2/PLACEHOLDER_AMPLA_OPS",
-        "teamsTeamId": "2c72dce3-8aee-4f00-b3ec-27b7743cfa32",
-        "teamsChannelId": "19:TXD14igEZrjLHABefOjPRYbx1_SCEez2uCvVn79O9lU1@thread.tacv2",
+        "teamsTeamId": "a5b3fdd9-4ffb-49a4-916c-15f5aea86fef",
+        "teamsChannelId": "19:NQb2njN0ABU9cqxTnQXgcqrjf9XojzGs2NC9D20cIYM1@thread.tacv2",
         "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com",
         "escalationGroup": "Operations-Managers",
         "securityLiaison": null,
@@ -76,8 +76,8 @@
       "routing": {
         "teamsChannelName": "Ampla-Engineering",
         "teamsChannelWebhookUrl": "https://company.webhook.office.com/webhookb2/PLACEHOLDER_AMPLA_ENG",
-        "teamsTeamId": "2c72dce3-8aee-4f00-b3ec-27b7743cfa32",
-        "teamsChannelId": "19:TXD14igEZrjLHABefOjPRYbx1_SCEez2uCvVn79O9lU1@thread.tacv2",
+        "teamsTeamId": "a5b3fdd9-4ffb-49a4-916c-15f5aea86fef",
+        "teamsChannelId": "19:NQb2njN0ABU9cqxTnQXgcqrjf9XojzGs2NC9D20cIYM1@thread.tacv2",
         "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com",
         "escalationGroup": null,
         "securityLiaison": null,
@@ -103,122 +103,15 @@
       "routing": {
         "teamsChannelName": "Security-Critical-HMI",
         "teamsChannelWebhookUrl": "https://company.webhook.office.com/webhookb2/PLACEHOLDER_INTOUCH_SECURITY",
-        "teamsTeamId": "2c72dce3-8aee-4f00-b3ec-27b7743cfa32",
-        "teamsChannelId": "19:TXD14igEZrjLHABefOjPRYbx1_SCEez2uCvVn79O9lU1@thread.tacv2",
+        "teamsTeamId": "a5b3fdd9-4ffb-49a4-916c-15f5aea86fef",
+        "teamsChannelId": "19:NQb2njN0ABU9cqxTnQXgcqrjf9XojzGs2NC9D20cIYM1@thread.tacv2",
         "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com",
         "escalationGroup": "CISO-Team",
         "securityLiaison": "psirt@company.com",
         "scenarios": ["A", "B", "C"]
       }
     },
-    {
-      "id": "rule-005",
-      "priority": 30,
-      "name": "InTouch — Standard Routing",
-      "enabled": true,
-      "effectiveFrom": "2024-01-01T00:00:00Z",
-      "effectiveTo": null,
-      "conditions": {
-        "product": "InTouch",
-        "productFamily": "HMI",
-        "areaPath": null,
-        "priority": "Any",
-        "workItemType": null,
-        "isCyberSecurity": null,
-        "isHotfix": null
-      },
-      "routing": {
-        "teamsChannelName": "InTouch-Engineering",
-        "teamsChannelWebhookUrl": "https://company.webhook.office.com/webhookb2/PLACEHOLDER_INTOUCH_ENG",
-        "teamsTeamId": "2c72dce3-8aee-4f00-b3ec-27b7743cfa32",
-        "teamsChannelId": "19:TXD14igEZrjLHABefOjPRYbx1_SCEez2uCvVn79O9lU1@thread.tacv2",
-        "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com",
-        "escalationGroup": null,
-        "securityLiaison": null,
-        "scenarios": ["A"]
-      }
-    },
-    {
-      "id": "rule-006",
-      "priority": 30,
-      "name": "Historian — Standard Routing",
-      "enabled": true,
-      "effectiveFrom": "2024-01-01T00:00:00Z",
-      "effectiveTo": null,
-      "conditions": {
-        "product": "Historian",
-        "productFamily": "Data",
-        "areaPath": null,
-        "priority": "Any",
-        "workItemType": null,
-        "isCyberSecurity": null,
-        "isHotfix": null
-      },
-      "routing": {
-        "teamsChannelName": "Historian-Engineering",
-        "teamsChannelWebhookUrl": "https://company.webhook.office.com/webhookb2/PLACEHOLDER_HISTORIAN_ENG",
-        "teamsTeamId": "2c72dce3-8aee-4f00-b3ec-27b7743cfa32",
-        "teamsChannelId": "19:TXD14igEZrjLHABefOjPRYbx1_SCEez2uCvVn79O9lU1@thread.tacv2",
-        "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com",
-        "escalationGroup": null,
-        "securityLiaison": null,
-        "scenarios": ["A"]
-      }
-    },
-    {
-      "id": "rule-007",
-      "priority": 10,
-      "name": "Any Product — P1 Hotfix",
-      "enabled": true,
-      "effectiveFrom": "2024-01-01T00:00:00Z",
-      "effectiveTo": null,
-      "conditions": {
-        "product": "Any",
-        "productFamily": null,
-        "areaPath": null,
-        "priority": "P1",
-        "workItemType": null,
-        "isCyberSecurity": null,
-        "isHotfix": true
-      },
-      "routing": {
-        "teamsChannelName": "Hotfix-Bridge",
-        "teamsChannelWebhookUrl": "https://company.webhook.office.com/webhookb2/PLACEHOLDER_HOTFIX",
-        "teamsTeamId": "2c72dce3-8aee-4f00-b3ec-27b7743cfa32",
-        "teamsChannelId": "19:TXD14igEZrjLHABefOjPRYbx1_SCEez2uCvVn79O9lU1@thread.tacv2",
-        "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com",
-        "escalationGroup": "Release-Managers",
-        "securityLiaison": null,
-        "scenarios": ["A", "B"]
-      }
-    },
-    {
-      "id": "rule-008",
-      "priority": 50,
-      "name": "Any Area Path — Security Bug",
-      "enabled": true,
-      "effectiveFrom": "2024-01-01T00:00:00Z",
-      "effectiveTo": null,
-      "conditions": {
-        "product": "Any",
-        "productFamily": null,
-        "areaPath": "Security",
-        "priority": "Any",
-        "workItemType": "Bug",
-        "isCyberSecurity": null,
-        "isHotfix": null
-      },
-      "routing": {
-        "teamsChannelName": "Security-Bugs",
-        "teamsChannelWebhookUrl": "https://company.webhook.office.com/webhookb2/PLACEHOLDER_SECURITY_BUGS",
-        "teamsTeamId": "2c72dce3-8aee-4f00-b3ec-27b7743cfa32",
-        "teamsChannelId": "19:TXD14igEZrjLHABefOjPRYbx1_SCEez2uCvVn79O9lU1@thread.tacv2",
-        "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com",
-        "escalationGroup": null,
-        "securityLiaison": "psirt@company.com",
-        "scenarios": ["A"]
-      }
-    },
+    
     {
       "id": "rule-999",
       "priority": 999,
@@ -238,8 +131,8 @@
       "routing": {
         "teamsChannelName": "General-Support",
         "teamsChannelWebhookUrl": "https://company.webhook.office.com/webhookb2/PLACEHOLDER_GENERAL",
-        "teamsTeamId": "2c72dce3-8aee-4f00-b3ec-27b7743cfa32",
-        "teamsChannelId": "19:TXD14igEZrjLHABefOjPRYbx1_SCEez2uCvVn79O9lU1@thread.tacv2",
+        "teamsTeamId": "a5b3fdd9-4ffb-49a4-916c-15f5aea86fef",
+        "teamsChannelId": "19:NQb2njN0ABU9cqxTnQXgcqrjf9XojzGs2NC9D20cIYM1@thread.tacv2",
         "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com",
         "escalationGroup": null,
         "securityLiaison": null,

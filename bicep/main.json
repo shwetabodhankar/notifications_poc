@@ -29,7 +29,7 @@
     },
     "appName": {
       "type": "string",
-      "defaultValue": "notifpoc",
+      "defaultValue": "notifypoc",
       "maxLength": 10,
       "metadata": {
         "description": "Short application name used in resource naming"

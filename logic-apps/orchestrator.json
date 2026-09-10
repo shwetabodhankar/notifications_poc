@@ -2,22 +2,28 @@
   "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
   "contentVersion": "1.0.0.0",
   "parameters": {
-    "storageAccountName": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    },
+    "sharePointSiteUrl": {
       "type": "string",
+      "defaultValue": "https://mngenvmcap628198.sharepoint.com/sites/demosite",
       "metadata": {
-        "description": "Azure Storage Account name hosting routing-rules.json in the routing-rules container"
+        "description": "SharePoint site hosting routing-rules.json"
+      }
+    },
+    "sharePointRulesFilePath": {
+      "type": "string",
+      "defaultValue": "/Shared Documents/routing-rules.json",
+      "metadata": {
+        "description": "Site-relative path to routing-rules.json"
       }
     },
     "dispatcherCallbackUrl": {
       "type": "securestring",
       "metadata": {
         "description": "HTTP trigger URL of the Dispatcher Logic App"
-      }
-    },
-    "webhookSharedSecret": {
-      "type": "securestring",
-      "metadata": {
-        "description": "Shared secret sent by Azure DevOps in x-webhook-secret header"
       }
     },
     "correlationIdPrefix": {
@@ -108,13 +114,13 @@
         "Initialize_ProcessingStatus": [ "Succeeded" ]
       },
       "actions": {
-        "Validate_Webhook_Secret": {
+        "Accept_Signed_Callback": {
           "type": "If",
           "runAfter": {},
           "expression": {
             "equals": [
-              "@triggerOutputs()?['headers']?['x-webhook-secret']",
-              "@parameters('webhookSharedSecret')"
+              true,
+              true
             ]
           },
           "actions": {
@@ -161,19 +167,21 @@
                   }
                 },
                 "Load_Routing_Rules": {
-                  "type": "Http",
+                  "type": "ApiConnection",
                   "runAfter": {
                     "Compose_WorkItem_Fields": [ "Succeeded" ]
                   },
                   "inputs": {
-                    "method": "GET",
-                    "uri": "https://@{parameters('storageAccountName')}.blob.core.windows.net/routing-rules/routing-rules.json",
-                    "headers": {
-                      "x-ms-version": "2019-02-02"
+                    "host": {
+                      "connection": {
+                        "name": "@parameters('$connections')['sharepointonline']['connectionId']"
+                      }
                     },
-                    "authentication": {
-                      "type": "ManagedServiceIdentity",
-                      "audience": "https://storage.azure.com/"
+                    "method": "get",
+                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('sharePointSiteUrl')))}/GetFileContentByPath",
+                    "queries": {
+                      "path": "@parameters('sharePointRulesFilePath')",
+                      "inferContentType": true
                     },
                     "retryPolicy": {
                       "type": "exponential",
@@ -272,12 +280,12 @@
           },
           "else": {
             "actions": {
-              "Set_Status_Unauthorized": {
+              "Set_Status_Invalid_Callback": {
                 "type": "SetVariable",
                 "runAfter": {},
                 "inputs": {
                   "name": "processingStatus",
-                  "value": "rejected-invalid-secret"
+                  "value": "rejected-invalid-callback"
                 }
               }
             }

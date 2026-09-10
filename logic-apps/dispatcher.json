@@ -93,7 +93,7 @@
                   {
                     "not": {
                       "equals": [
-                        "@item()?['routing']?['teamsChannelWebhookUrl']",
+                        "@item()?['routing']?['teamsTeamId']",
                         null
                       ]
                     }
@@ -101,7 +101,23 @@
                   {
                     "not": {
                       "equals": [
-                        "@item()?['routing']?['teamsChannelWebhookUrl']",
+                        "@item()?['routing']?['teamsTeamId']",
+                        ""
+                      ]
+                    }
+                  },
+                  {
+                    "not": {
+                      "equals": [
+                        "@item()?['routing']?['teamsChannelId']",
+                        null
+                      ]
+                    }
+                  },
+                  {
+                    "not": {
+                      "equals": [
+                        "@item()?['routing']?['teamsChannelId']",
                         ""
                       ]
                     }
@@ -121,7 +137,6 @@
                     },
                     "body": {
                       "correlationId": "@triggerBody()?['correlationId']",
-                      "channelWebhookUrl": "@item()?['routing']?['teamsChannelWebhookUrl']",
                       "channelName": "@item()?['routing']?['teamsChannelName']",
                       "teamsTeamId": "@item()?['routing']?['teamsTeamId']",
                       "teamsChannelId": "@item()?['routing']?['teamsChannelId']",

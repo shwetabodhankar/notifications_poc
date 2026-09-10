@@ -13,13 +13,6 @@ param emailNotifierLaName string
 @description('Azure region')
 param location string
 
-@description('Storage Account name hosting routing-rules.json')
-param storageAccountName string
-
-@description('ADO webhook shared secret used to validate incoming webhook calls')
-@secure()
-param webhookSharedSecret string
-
 @description('SendGrid API key')
 @secure()
 param sendGridApiKey string
@@ -36,11 +29,21 @@ param logAnalyticsWorkspaceId string
 @description('Service account email used to authenticate the Teams API connection (e.g. svc-notify@company.com)')
 param teamsServiceAccountEmail string = 'sbodhankar@MngEnvMCAP628198.onmicrosoft.com'
 
+@description('Service account email used to authenticate the SharePoint API connection')
+param sharePointServiceAccountEmail string = teamsServiceAccountEmail
+
+@description('SharePoint site hosting routing-rules.json')
+param sharePointSiteUrl string = 'https://mngenvmcap628198.sharepoint.com/sites/demosite'
+
+@description('Site-relative path to routing-rules.json')
+param sharePointRulesFilePath string = '/Shared Documents/routing-rules.json'
+
 @description('Resource tags')
 param tags object = {}
 
 var teamsConnectionName = 'conn-teams-${teamsNotifierLaName}'
 var teamsConnectorLaName = '${teamsNotifierLaName}-connector'
+var sharePointConnectionName = 'conn-sharepoint-${orchestratorLaName}'
 
 // ---------------------------------------------------------------------------
 // Teams API Connection (service account — must be authorized post-deploy)
@@ -197,7 +200,7 @@ resource dispatcherLogicApp 'Microsoft.Logic/workflows@2019-05-01' = {
     parameters: {
       teamsNotifierUrl: {
         value: listCallbackUrl(
-          '${teamsNotifierLogicApp.id}/triggers/Receive_Teams_Notification_Request',
+          '${teamsConnectorLogicApp.id}/triggers/Receive_Teams_Notification_Request',
           '2019-05-01'
         ).value
       }
@@ -210,7 +213,7 @@ resource dispatcherLogicApp 'Microsoft.Logic/workflows@2019-05-01' = {
     }
   }
   dependsOn: [
-    teamsNotifierLogicApp
+    teamsConnectorLogicApp
     emailNotifierLogicApp
   ]
 }
@@ -238,6 +241,18 @@ resource dispatcherDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01
 // ---------------------------------------------------------------------------
 // Orchestrator Logic App
 // ---------------------------------------------------------------------------
+resource sharePointConnection 'Microsoft.Web/connections@2016-06-01' = {
+  name: sharePointConnectionName
+  location: location
+  tags: tags
+  properties: {
+    displayName: sharePointServiceAccountEmail
+    api: {
+      id: subscriptionResourceId('Microsoft.Web/locations/managedApis', location, 'sharepointonline')
+    }
+  }
+}
+
 resource orchestratorLogicApp 'Microsoft.Logic/workflows@2019-05-01' = {
   name: orchestratorLaName
   location: location
@@ -249,17 +264,26 @@ resource orchestratorLogicApp 'Microsoft.Logic/workflows@2019-05-01' = {
     state: 'Enabled'
     definition: loadJsonContent('../../logic-apps/orchestrator.json')
     parameters: {
-      storageAccountName: {
-        value: storageAccountName
+      '$connections': {
+        value: {
+          sharepointonline: {
+            connectionId: sharePointConnection.id
+            connectionName: sharePointConnectionName
+            id: subscriptionResourceId('Microsoft.Web/locations/managedApis', location, 'sharepointonline')
+          }
+        }
+      }
+      sharePointSiteUrl: {
+        value: sharePointSiteUrl
+      }
+      sharePointRulesFilePath: {
+        value: sharePointRulesFilePath
       }
       dispatcherCallbackUrl: {
         value: listCallbackUrl(
           '${dispatcherLogicApp.id}/triggers/Receive_Dispatch_Request',
           '2019-05-01'
         ).value
-      }
-      webhookSharedSecret: {
-        value: webhookSharedSecret
       }
       correlationIdPrefix: {
         value: 'NOTIF'
@@ -314,3 +338,4 @@ output logicAppPrincipalIds array = [
 
 output teamsConnectorLogicAppName string = teamsConnectorLaName
 output teamsConnectionName string = teamsConnectionName
+output sharePointConnectionName string = sharePointConnectionName

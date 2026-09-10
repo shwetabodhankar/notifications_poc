@@ -1,8 +1,8 @@
 using '../main.bicep'
 
 param environmentName = 'dev'
-param location = 'eastus'
-param appName = 'notifpoc'
+param location = 'westus2'
+param appName = 'notifypoc'
 param logRetentionDays = 30
 param notificationFromEmail = 'notifications-dev@company.com'
 

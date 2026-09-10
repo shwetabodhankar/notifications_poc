@@ -19,7 +19,7 @@
     Azure region (default: eastus)
 
 .PARAMETER AppName
-    Short application name prefix for resource naming (default: notifpoc)
+    Short application name prefix for resource naming (default: notifications)
 
 .PARAMETER WebhookSecret
     Shared secret for ADO webhook validation. If not provided, a random value is generated.
@@ -30,8 +30,17 @@
 .PARAMETER SendGridApiKey
     SendGrid API key for email delivery. Optional — omit to deploy without email (Teams still works).
 
+.PARAMETER OwnerTech
+    Technical owner email. Must be an @aveva.com address.
+
+.PARAMETER OwnerBusiness
+    Business owner email. Must be an @aveva.com address.
+
+.PARAMETER Team
+    Official team name used for Azure resource tagging.
+
 .EXAMPLE
-    .\deploy.ps1 -Environment dev -ResourceGroup rg-notifpoc-dev -SendGridApiKey $env:SENDGRID_KEY
+    .\deploy.ps1 -Environment dev -ResourceGroup rg-notifications-dev -SendGridApiKey $env:SENDGRID_KEY
 #>
 [CmdletBinding()]
 param (
@@ -42,15 +51,27 @@ param (
     [Parameter(Mandatory)]
     [string]$ResourceGroup,
 
-    [string]$Location = 'eastus',
+    [string]$Location = 'west2',
 
-    [string]$AppName = 'notifpoc',
+    [string]$AppName = 'notificationspoc',
 
     [string]$SubscriptionId,
 
     [string]$WebhookSecret,
 
-    [string]$SendGridApiKey = 'SENDGRID_NOT_CONFIGURED'
+    [string]$SendGridApiKey = 'SENDGRID_NOT_CONFIGURED',
+
+    [Parameter(Mandatory)]
+    [ValidatePattern('(?i)^[^@\s]+@aveva\.com$')]
+    [string]$OwnerTech,
+
+    [Parameter(Mandatory)]
+    [ValidatePattern('(?i)^[^@\s]+@aveva\.com$')]
+    [string]$OwnerBusiness,
+
+    [Parameter(Mandatory)]
+    [ValidateNotNullOrEmpty()]
+    [string]$Team
 )
 
 Set-StrictMode -Version Latest
@@ -103,6 +124,9 @@ if ($SubscriptionId) {
     Write-Host '  Subscription set.' -ForegroundColor Green
 }
 
+$SubscriptionId = az account show --query id --output tsv
+if (-not $SubscriptionId) { throw 'Could not determine the active Azure subscription ID.' }
+
 if (-not $WebhookSecret) {
     $WebhookSecret = New-WebhookSecret
     Write-Host "  Generated random webhook secret. Save this value in Key Vault or a secrets manager:" -ForegroundColor Yellow
@@ -114,16 +138,49 @@ if (-not $WebhookSecret) {
 # ---------------------------------------------------------------------------
 Write-Step 'Step 1 — Ensuring resource group exists'
 
+$createDate = Get-Date -Format 'yyyy.MM.dd'
+$resourceTags = @{
+    environment   = $Environment
+    application   = 'enterprise-notification-routing'
+    managedBy     = 'bicep'
+    OwnerTech     = $OwnerTech
+    OwnerBusiness = $OwnerBusiness
+    CreateDate    = $createDate
+    team          = $Team
+}
+
 $rgExists = az group exists --name $ResourceGroup
 if ($rgExists -eq 'false') {
     Write-Host "  Creating resource group '$ResourceGroup' in '$Location'..." -ForegroundColor White
     az group create `
         --name $ResourceGroup `
         --location $Location `
-        --tags "environment=$Environment" "application=enterprise-notification-routing" | Out-Null
+        --tags `
+            "environment=$Environment" `
+            'application=enterprise-notification-routing' `
+            'managedBy=bicep' `
+            "OwnerTech=$OwnerTech" `
+            "OwnerBusiness=$OwnerBusiness" `
+            "CreateDate=$createDate" `
+            "team=$Team" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Failed to create resource group '$ResourceGroup'." }
     Write-Host '  Resource group created.' -ForegroundColor Green
 } else {
     Write-Host "  Resource group '$ResourceGroup' already exists." -ForegroundColor Green
+    Write-Host '  Merging required policy tags into the resource group...' -ForegroundColor White
+    $resourceGroupId = az group show --name $ResourceGroup --query id --output tsv
+    az tag update `
+        --resource-id $resourceGroupId `
+        --operation Merge `
+        --tags `
+            "environment=$Environment" `
+            'application=enterprise-notification-routing' `
+            'managedBy=bicep' `
+            "OwnerTech=$OwnerTech" `
+            "OwnerBusiness=$OwnerBusiness" `
+            "CreateDate=$createDate" `
+            "team=$Team" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Failed to update tags on resource group '$ResourceGroup'." }
 }
 
 # ---------------------------------------------------------------------------
@@ -131,7 +188,7 @@ if ($rgExists -eq 'false') {
 # ---------------------------------------------------------------------------
 Write-Step 'Step 2 — Deploying infrastructure via Bicep'
 
-$deploymentName = "notifpoc-${Environment}-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+$deploymentName = "notifications-${Environment}-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
 
 $bicepMain   = Join-Path $projectRoot 'bicep\main.bicep'
 $bicepParams = Join-Path $projectRoot "bicep\parameters\main.$Environment.bicepparam"
@@ -141,8 +198,8 @@ if (-not (Test-Path $bicepMain)) { throw "Bicep file not found: $bicepMain" }
 # Pre-compile Bicep → ARM JSON to avoid the CLI double-compilation streaming bug.
 # When az deployment group create receives a .bicep file it compiles it internally
 # twice (once for validation, once for submit), which corrupts the HTTP response stream.
-$armJsonPath    = Join-Path $env:TEMP "notifpoc-main-$deploymentName.json"
-$armParamsPath  = Join-Path $env:TEMP "notifpoc-params-$deploymentName.json"
+$armJsonPath    = Join-Path $env:TEMP "notifications-main-$deploymentName.json"
+$armParamsPath  = Join-Path $env:TEMP "notifications-params-$deploymentName.json"
 
 Write-Host "  Compiling Bicep to ARM JSON..." -ForegroundColor White
 az bicep build --file $bicepMain --outfile $armJsonPath 2>&1 | Where-Object { $_ -notmatch '^WARNING|^A new Bicep' } | ForEach-Object { Write-Host $_ }
@@ -164,11 +221,7 @@ if ($LASTEXITCODE -ne 0) {
             adoOrganisationUrl    = @{ value = 'https://dev.azure.com/sbodhankar0209' }
             webhookSharedSecret   = @{ value = $WebhookSecret }
             sendGridApiKey        = @{ value = $SendGridApiKey }
-            tags                  = @{ value = @{
-                environment       = $Environment
-                application       = 'enterprise-notification-routing'
-                managedBy         = 'bicep'
-            }}
+            tags                  = @{ value = $resourceTags }
         }
     } | ConvertTo-Json -Depth 10 | Set-Content $armParamsPath
 } else {
@@ -176,6 +229,7 @@ if ($LASTEXITCODE -ne 0) {
     $p = Get-Content $armParamsPath -Raw | ConvertFrom-Json
     $p.parameters.webhookSharedSecret = @{ value = $WebhookSecret }
     $p.parameters.sendGridApiKey      = @{ value = $SendGridApiKey }
+    $p.parameters.tags                = @{ value = $resourceTags }
     $p | ConvertTo-Json -Depth 10 | Set-Content $armParamsPath
 }
 
@@ -233,34 +287,10 @@ Write-Host "  Infrastructure deployed successfully (deployment: $deploymentName)
 # Clean up temp files
 Remove-Item $armJsonPath, $armParamsPath -ErrorAction SilentlyContinue
 
-# Extract outputs
-$outputs            = $deploymentOutput.properties.outputs
-$storageAccountName = $outputs.storageAccountName.value
-
-Write-Host "  Infrastructure deployed successfully (deployment: $deploymentName)" -ForegroundColor Green
-
 # ---------------------------------------------------------------------------
-# Step 4 — Network Security Perimeter (allows upload despite policy-forced Disabled)
+# Step 3 — Validate deployment
 # ---------------------------------------------------------------------------
-Write-Step 'Step 3 — Configuring Network Security Perimeter for storage access'
-
-& "$scriptRoot\setup-nsp.ps1" `
-    -ResourceGroup $ResourceGroup `
-    -StorageAccountName $storageAccountName `
-    -SubscriptionId $SubscriptionId `
-    -NspName "nsp-$AppName-$Environment"
-
-# ---------------------------------------------------------------------------
-# Step 5 — Upload routing rules
-# ---------------------------------------------------------------------------
-Write-Step 'Step 4 — Uploading routing rules configuration'
-
-& "$scriptRoot\upload-rules.ps1" -ResourceGroup $ResourceGroup
-
-# ---------------------------------------------------------------------------
-# Step 5 — Validate deployment
-# ---------------------------------------------------------------------------
-Write-Step 'Step 5 — Validating deployment'
+Write-Step 'Step 3 — Validating deployment'
 
 $orchestratorUrl = $deploymentOutput.orchestratorTriggerEndpoint.value
 $testPayload = @{
@@ -295,7 +325,6 @@ try {
         -Method Post `
         -Uri $orchestratorUrl `
         -ContentType 'application/json' `
-        -Headers @{ 'x-webhook-secret' = $WebhookSecret } `
         -Body $testPayload
 
     Write-Host "  Validation response: $($response | ConvertTo-Json -Compress)" -ForegroundColor Green
@@ -317,10 +346,10 @@ Write-Host "  ┌─ Next Steps ────────────────
 Write-Host "  │" -ForegroundColor Cyan
 Write-Host "  │  1. Configure Azure DevOps webhook:" -ForegroundColor Cyan
 Write-Host "  │     URL: (see Orchestrator trigger URL in Azure Portal)" -ForegroundColor Cyan
-Write-Host "  │     Header: x-webhook-secret: $WebhookSecret" -ForegroundColor Cyan
+Write-Host "  │     Authentication: signed callback URL" -ForegroundColor Cyan
 Write-Host "  │" -ForegroundColor Cyan
-Write-Host "  │  2. Update routing-rules.json with real Teams webhook URLs" -ForegroundColor Cyan
-Write-Host "  │     then re-run: .\upload-rules.ps1 -ResourceGroup $ResourceGroup" -ForegroundColor Cyan
+Write-Host "  │  2. Authorize the SharePoint and Teams API connections" -ForegroundColor Cyan
+Write-Host "  │     in Azure Portal, then test a work-item event" -ForegroundColor Cyan
 Write-Host "  │" -ForegroundColor Cyan
 Write-Host "  │  3. Monitor via Application Insights:" -ForegroundColor Cyan
 Write-Host "  │     https://portal.azure.com/#resource/subscriptions/.../overview" -ForegroundColor Cyan

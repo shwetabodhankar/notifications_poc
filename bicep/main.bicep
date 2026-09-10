@@ -7,7 +7,7 @@ param location string = resourceGroup().location
 
 @description('Short application name used in resource naming')
 @maxLength(10)
-param appName string = 'notifpoc'
+param appName string = 'notifypoc'
 
 @description('Azure DevOps webhook shared secret — stored in Key Vault post-deploy')
 @secure()
@@ -30,6 +30,15 @@ param adoOrganisationUrl string = 'https://dev.azure.com'
 
 @description('Service account email for the Teams API connection')
 param teamsServiceAccountEmail string = 'sbodhankar@MngEnvMCAP628198.onmicrosoft.com'
+
+@description('Service account email for the SharePoint API connection')
+param sharePointServiceAccountEmail string = teamsServiceAccountEmail
+
+@description('SharePoint site hosting routing-rules.json')
+param sharePointSiteUrl string = 'https://mngenvmcap628198.sharepoint.com/sites/demosite'
+
+@description('Site-relative path to routing-rules.json')
+param sharePointRulesFilePath string = '/Shared Documents/routing-rules.json'
 
 @description('Tags applied to all resources')
 param tags object = {
@@ -98,12 +107,13 @@ module logicApps './modules/logic-apps.bicep' = {
     teamsNotifierLaName: teamsNotifierLaName
     emailNotifierLaName: emailNotifierLaName
     location: location
-    storageAccountName: storageAccountName
-    webhookSharedSecret: webhookSharedSecret
     sendGridApiKey: sendGridApiKey
     notificationFromEmail: notificationFromEmail
     adoOrganisationUrl: adoOrganisationUrl
     teamsServiceAccountEmail: teamsServiceAccountEmail
+    sharePointServiceAccountEmail: sharePointServiceAccountEmail
+    sharePointSiteUrl: sharePointSiteUrl
+    sharePointRulesFilePath: sharePointRulesFilePath
     logAnalyticsWorkspaceId: appInsights.outputs.logAnalyticsWorkspaceId
     tags: tags
   }
@@ -146,3 +156,4 @@ output keyVaultName string = keyVault.outputs.keyVaultName
 output appInsightsName string = appInsights.outputs.appInsightsName
 output teamsConnectorLogicAppName string = logicApps.outputs.teamsConnectorLogicAppName
 output teamsConnectionName string = logicApps.outputs.teamsConnectionName
+output sharePointConnectionName string = logicApps.outputs.sharePointConnectionName

@@ -151,6 +151,26 @@
           ],
           "description": "Teams incoming webhook URL; null disables Teams notification"
         },
+        "teamsTeamId": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+            },
+            { "type": "null" }
+          ],
+          "description": "Microsoft Teams team (Microsoft 365 group) ID; null disables connector delivery"
+        },
+        "teamsChannelId": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^19:.+@thread\\.tacv2$"
+            },
+            { "type": "null" }
+          ],
+          "description": "Microsoft Teams channel ID; null disables connector delivery"
+        },
         "emailGroup": {
           "type": "string",
           "format": "email",
