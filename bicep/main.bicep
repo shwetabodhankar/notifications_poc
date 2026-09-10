@@ -9,10 +9,6 @@ param location string = resourceGroup().location
 @maxLength(10)
 param appName string = 'notifypoc'
 
-@description('Azure DevOps webhook shared secret — stored in Key Vault post-deploy')
-@secure()
-param webhookSharedSecret string
-
 @description('SendGrid API key for email delivery. Leave as default placeholder to skip email — Teams notifications still work.')
 @secure()
 param sendGridApiKey string = 'SENDGRID_NOT_CONFIGURED'
@@ -50,13 +46,7 @@ param tags object = {
 
 // ---------------------------------------------------------------------------
 // Naming convention: <type>-<app>-<env>
-// 4-char suffix derived from subscription ID ensures globally-unique names
-// when the same appName+env is deployed to multiple subscriptions.
 // ---------------------------------------------------------------------------
-var uniqueSuffix          = take(uniqueString(subscription().subscriptionId), 4)
-var storageAccountBaseName = replace('st${appName}${environmentName}', '-', '')
-var storageAccountName     = '${storageAccountBaseName}${uniqueSuffix}'
-var keyVaultName           = 'kv-${appName}-${environmentName}-${uniqueSuffix}'
 var appInsightsName = 'appi-${appName}-${environmentName}'
 var logAnalyticsName = 'law-${appName}-${environmentName}'
 var orchestratorLaName = 'la-notif-orchestrator-${environmentName}'
@@ -67,26 +57,6 @@ var emailNotifierLaName = 'la-notif-email-${environmentName}'
 // ---------------------------------------------------------------------------
 // Modules
 // ---------------------------------------------------------------------------
-
-module storage './modules/storage.bicep' = {
-  name: 'storage-${environmentName}'
-  params: {
-    storageAccountName: storageAccountName
-    location: location
-    tags: tags
-  }
-}
-
-module keyVault './modules/keyvault.bicep' = {
-  name: 'keyvault-${environmentName}'
-  params: {
-    keyVaultName: keyVaultName
-    location: location
-    tags: tags
-    webhookSharedSecret: webhookSharedSecret
-    sendGridApiKey: sendGridApiKey
-  }
-}
 
 module appInsights './modules/app-insights.bicep' = {
   name: 'appinsights-${environmentName}'
@@ -117,32 +87,6 @@ module logicApps './modules/logic-apps.bicep' = {
     logAnalyticsWorkspaceId: appInsights.outputs.logAnalyticsWorkspaceId
     tags: tags
   }
-  dependsOn: [
-    keyVault
-    appInsights
-  ]
-}
-
-// Grant each Logic App's Managed Identity read access to the routing-rules blob container
-module laStorageRoleAssignment './modules/role-assignment.bicep' = {
-  name: 'la-storage-rbac-${environmentName}'
-  params: {
-    principalIds: logicApps.outputs.logicAppPrincipalIds
-    storageAccountId: storage.outputs.storageAccountId
-    roleName: 'Storage Blob Data Reader'
-  }
-  dependsOn: [ logicApps, storage ]
-}
-
-// Grant each Logic App's Managed Identity Key Vault Secrets access
-module laKvRoleAssignment './modules/role-assignment.bicep' = {
-  name: 'la-kv-rbac-${environmentName}'
-  params: {
-    principalIds: logicApps.outputs.logicAppPrincipalIds
-    keyVaultId: keyVault.outputs.keyVaultId
-    roleName: 'Key Vault Secrets User'
-  }
-  dependsOn: [ logicApps, keyVault ]
 }
 
 // ---------------------------------------------------------------------------
@@ -150,9 +94,6 @@ module laKvRoleAssignment './modules/role-assignment.bicep' = {
 // ---------------------------------------------------------------------------
 
 output orchestratorTriggerEndpoint string = logicApps.outputs.orchestratorEndpoint
-output dispatcherTriggerEndpoint string = logicApps.outputs.dispatcherEndpoint
-output storageAccountName string = storage.outputs.storageAccountName
-output keyVaultName string = keyVault.outputs.keyVaultName
 output appInsightsName string = appInsights.outputs.appInsightsName
 output teamsConnectorLogicAppName string = logicApps.outputs.teamsConnectorLogicAppName
 output teamsConnectionName string = logicApps.outputs.teamsConnectionName

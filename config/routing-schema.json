@@ -144,13 +144,6 @@
           "minLength": 1,
           "description": "Human-readable Teams channel name for logging"
         },
-        "teamsChannelWebhookUrl": {
-          "oneOf": [
-            { "type": "string", "format": "uri" },
-            { "type": "null" }
-          ],
-          "description": "Teams incoming webhook URL; null disables Teams notification"
-        },
         "teamsTeamId": {
           "oneOf": [
             {

@@ -5,9 +5,8 @@
 .DESCRIPTION
     End-to-end deployment script that:
     1. Creates or validates the resource group
-    2. Deploys Bicep infrastructure (storage, key vault, app insights, functions, logic apps)
-    3. Publishes the Azure Function (rule engine) via zip deploy
-    4. Outputs the Orchestrator webhook URL for ADO configuration
+    2. Deploys Bicep infrastructure (Application Insights, Logic Apps, and API connections)
+    3. Outputs the Orchestrator callback URL for Azure DevOps configuration
 
 .PARAMETER Environment
     Target environment: dev, staging, or prod
@@ -20,9 +19,6 @@
 
 .PARAMETER AppName
     Short application name prefix for resource naming (default: notifications)
-
-.PARAMETER WebhookSecret
-    Shared secret for ADO webhook validation. If not provided, a random value is generated.
 
 .PARAMETER SubscriptionId
     Azure subscription ID. If provided, sets the active subscription before deploying.
@@ -65,8 +61,6 @@ param (
     [string]$AppName = 'notificationspoc',
 
     [string]$SubscriptionId,
-
-    [string]$WebhookSecret,
 
     [string]$SendGridApiKey = 'SENDGRID_NOT_CONFIGURED',
 
@@ -119,12 +113,6 @@ function Assert-AzureCli {
     Write-Host "  Logged in to subscription: $($account.name)" -ForegroundColor Green
 }
 
-function New-WebhookSecret {
-    # Generate a cryptographically random 32-character hex string
-    $bytes = [System.Security.Cryptography.RandomNumberGenerator]::GetBytes(16)
-    return [System.BitConverter]::ToString($bytes).Replace('-', '').ToLowerInvariant()
-}
-
 # ---------------------------------------------------------------------------
 # Step 0 — Validate prerequisites
 # ---------------------------------------------------------------------------
@@ -144,12 +132,6 @@ if ($SubscriptionId) {
 
 $SubscriptionId = az account show --query id --output tsv
 if (-not $SubscriptionId) { throw 'Could not determine the active Azure subscription ID.' }
-
-if (-not $WebhookSecret) {
-    $WebhookSecret = New-WebhookSecret
-    Write-Host "  Generated random webhook secret. Save this value in Key Vault or a secrets manager:" -ForegroundColor Yellow
-    Write-Host "  $WebhookSecret" -ForegroundColor Yellow
-}
 
 # ---------------------------------------------------------------------------
 # Step 1 — Create resource group
@@ -237,7 +219,6 @@ if ($LASTEXITCODE -ne 0) {
             logRetentionDays      = @{ value = 30 }
             notificationFromEmail = @{ value = "notifications-$Environment@company.com" }
             adoOrganisationUrl    = @{ value = 'https://dev.azure.com/sbodhankar0209' }
-            webhookSharedSecret   = @{ value = $WebhookSecret }
             sendGridApiKey        = @{ value = $SendGridApiKey }
             sharePointServiceAccountEmail = @{ value = $SharePointServiceAccountEmail }
             sharePointSiteUrl     = @{ value = $SharePointSiteUrl }
@@ -248,7 +229,6 @@ if ($LASTEXITCODE -ne 0) {
 } else {
     # Inject runtime secrets into the compiled params JSON
     $p = Get-Content $armParamsPath -Raw | ConvertFrom-Json
-    $p.parameters.webhookSharedSecret = @{ value = $WebhookSecret }
     $p.parameters.sendGridApiKey      = @{ value = $SendGridApiKey }
     $p.parameters | Add-Member -MemberType NoteProperty -Name sharePointServiceAccountEmail -Value @{ value = $SharePointServiceAccountEmail } -Force
     $p.parameters | Add-Member -MemberType NoteProperty -Name sharePointSiteUrl -Value @{ value = $SharePointSiteUrl } -Force
@@ -303,8 +283,6 @@ if ($status -ne 'Succeeded') {
 $deploymentOutput   = az deployment group show `
     --name $deploymentName --resource-group $ResourceGroup `
     --query "properties.outputs" --output json 2>$null | ConvertFrom-Json
-
-$storageAccountName = $deploymentOutput.storageAccountName.value
 
 Write-Host "  Infrastructure deployed successfully (deployment: $deploymentName)" -ForegroundColor Green
 
@@ -364,7 +342,6 @@ Write-Step 'Deployment Complete'
 
 Write-Host "  Environment:           $Environment" -ForegroundColor White
 Write-Host "  Resource Group:        $ResourceGroup" -ForegroundColor White
-Write-Host "  Storage Account:       $storageAccountName" -ForegroundColor White
 Write-Host "" -ForegroundColor White
 Write-Host "  ┌─ Next Steps ─────────────────────────────────────────────┐" -ForegroundColor Cyan
 Write-Host "  │" -ForegroundColor Cyan

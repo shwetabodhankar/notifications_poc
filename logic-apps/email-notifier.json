@@ -4,7 +4,7 @@
   "parameters": {
     "sendGridApiKey": {
       "type": "securestring",
-      "metadata": { "description": "SendGrid API key stored in Key Vault" }
+      "metadata": { "description": "SendGrid API key supplied as a secure deployment parameter" }
     },
     "emailFromAddress": {
       "type": "string",

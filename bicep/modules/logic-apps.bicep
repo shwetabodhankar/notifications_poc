@@ -67,9 +67,6 @@ resource teamsConnectorLogicApp 'Microsoft.Logic/workflows@2019-05-01' = {
   name: teamsConnectorLaName
   location: location
   tags: tags
-  identity: {
-    type: 'SystemAssigned'
-  }
   properties: {
     state: 'Enabled'
     definition: loadJsonContent('../../logic-apps/teams-notifier-connector.json')
@@ -98,52 +95,12 @@ resource teamsConnectorDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-0
 }
 
 // ---------------------------------------------------------------------------
-// Teams Notifier Logic App (deployed first — no dependencies on other LAs)
-// ---------------------------------------------------------------------------
-resource teamsNotifierLogicApp 'Microsoft.Logic/workflows@2019-05-01' = {
-  name: teamsNotifierLaName
-  location: location
-  tags: tags
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {
-    state: 'Enabled'
-    definition: loadJsonContent('../../logic-apps/teams-notifier.json')
-    parameters: {}
-  }
-}
-
-resource teamsNotifierDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
-  name: 'diag-${teamsNotifierLaName}'
-  scope: teamsNotifierLogicApp
-  properties: {
-    workspaceId: logAnalyticsWorkspaceId
-    logs: [
-      {
-        category: 'WorkflowRuntime'
-        enabled: true
-      }
-    ]
-    metrics: [
-      {
-        category: 'AllMetrics'
-        enabled: true
-      }
-    ]
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Email Notifier Logic App
 // ---------------------------------------------------------------------------
 resource emailNotifierLogicApp 'Microsoft.Logic/workflows@2019-05-01' = {
   name: emailNotifierLaName
   location: location
   tags: tags
-  identity: {
-    type: 'SystemAssigned'
-  }
   properties: {
     state: 'Enabled'
     definition: loadJsonContent('../../logic-apps/email-notifier.json')
@@ -191,9 +148,6 @@ resource dispatcherLogicApp 'Microsoft.Logic/workflows@2019-05-01' = {
   name: dispatcherLaName
   location: location
   tags: tags
-  identity: {
-    type: 'SystemAssigned'
-  }
   properties: {
     state: 'Enabled'
     definition: loadJsonContent('../../logic-apps/dispatcher.json')
@@ -212,10 +166,6 @@ resource dispatcherLogicApp 'Microsoft.Logic/workflows@2019-05-01' = {
       }
     }
   }
-  dependsOn: [
-    teamsConnectorLogicApp
-    emailNotifierLogicApp
-  ]
 }
 
 resource dispatcherDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
@@ -257,9 +207,6 @@ resource orchestratorLogicApp 'Microsoft.Logic/workflows@2019-05-01' = {
   name: orchestratorLaName
   location: location
   tags: tags
-  identity: {
-    type: 'SystemAssigned'
-  }
   properties: {
     state: 'Enabled'
     definition: loadJsonContent('../../logic-apps/orchestrator.json')
@@ -290,9 +237,6 @@ resource orchestratorLogicApp 'Microsoft.Logic/workflows@2019-05-01' = {
       }
     }
   }
-  dependsOn: [
-    dispatcherLogicApp
-  ]
 }
 
 resource orchestratorDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
@@ -322,19 +266,6 @@ output orchestratorEndpoint string = listCallbackUrl(
   '${orchestratorLogicApp.id}/triggers/Receive_WorkItem_Webhook',
   '2019-05-01'
 ).value
-
-output dispatcherEndpoint string = listCallbackUrl(
-  '${dispatcherLogicApp.id}/triggers/Receive_Dispatch_Request',
-  '2019-05-01'
-).value
-
-output logicAppPrincipalIds array = [
-  orchestratorLogicApp.identity.principalId
-  dispatcherLogicApp.identity.principalId
-  teamsNotifierLogicApp.identity.principalId
-  teamsConnectorLogicApp.identity.principalId
-  emailNotifierLogicApp.identity.principalId
-]
 
 output teamsConnectorLogicAppName string = teamsConnectorLaName
 output teamsConnectionName string = teamsConnectionName

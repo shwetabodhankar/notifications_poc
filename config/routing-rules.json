@@ -21,7 +21,6 @@
       },
       "routing": {
         "teamsChannelName": "Devops-Notifications-Channel",
-        "teamsChannelWebhookUrl": "https://defaultc508696dbdfc487ab57b138782c41d.a2.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/351877a1113c4d0c95727c695a9c29c8/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=zTPs7QJ9e0YD3KXYcbO695gfnblrLmVRPC7kFaR4Bqk",
         "teamsTeamId": "a5b3fdd9-4ffb-49a4-916c-15f5aea86fef",
         "teamsChannelId": "19:NQb2njN0ABU9cqxTnQXgcqrjf9XojzGs2NC9D20cIYM1@thread.tacv2",
         "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com",
@@ -48,7 +47,6 @@
       },
       "routing": {
         "teamsChannelName": "Operations-Critical",
-        "teamsChannelWebhookUrl": "https://company.webhook.office.com/webhookb2/PLACEHOLDER_AMPLA_OPS",
         "teamsTeamId": "a5b3fdd9-4ffb-49a4-916c-15f5aea86fef",
         "teamsChannelId": "19:NQb2njN0ABU9cqxTnQXgcqrjf9XojzGs2NC9D20cIYM1@thread.tacv2",
         "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com",
@@ -75,7 +73,6 @@
       },
       "routing": {
         "teamsChannelName": "Ampla-Engineering",
-        "teamsChannelWebhookUrl": "https://company.webhook.office.com/webhookb2/PLACEHOLDER_AMPLA_ENG",
         "teamsTeamId": "a5b3fdd9-4ffb-49a4-916c-15f5aea86fef",
         "teamsChannelId": "19:NQb2njN0ABU9cqxTnQXgcqrjf9XojzGs2NC9D20cIYM1@thread.tacv2",
         "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com",
@@ -102,7 +99,6 @@
       },
       "routing": {
         "teamsChannelName": "Security-Critical-HMI",
-        "teamsChannelWebhookUrl": "https://company.webhook.office.com/webhookb2/PLACEHOLDER_INTOUCH_SECURITY",
         "teamsTeamId": "a5b3fdd9-4ffb-49a4-916c-15f5aea86fef",
         "teamsChannelId": "19:NQb2njN0ABU9cqxTnQXgcqrjf9XojzGs2NC9D20cIYM1@thread.tacv2",
         "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com",
@@ -130,7 +126,6 @@
       },
       "routing": {
         "teamsChannelName": "General-Support",
-        "teamsChannelWebhookUrl": "https://company.webhook.office.com/webhookb2/PLACEHOLDER_GENERAL",
         "teamsTeamId": "a5b3fdd9-4ffb-49a4-916c-15f5aea86fef",
         "teamsChannelId": "19:NQb2njN0ABU9cqxTnQXgcqrjf9XojzGs2NC9D20cIYM1@thread.tacv2",
         "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com",

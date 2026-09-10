@@ -11,10 +11,8 @@ param notificationFromEmail = 'notifications-dev@company.com'
 // Do NOT commit real secret values to source control
 // Example:
 //   az deployment group create ... \
-//     --parameters webhookSharedSecret="$env:WEBHOOK_SECRET" \
 //     --parameters sendGridApiKey="$env:SENDGRID_KEY"
 param adoOrganisationUrl = 'https://dev.azure.com/sbodhankar0209'
-param webhookSharedSecret = 'REPLACE_AT_DEPLOY_TIME'
 param sendGridApiKey = 'REPLACE_AT_DEPLOY_TIME'
 
 param tags = {

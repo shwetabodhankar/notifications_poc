@@ -34,7 +34,6 @@ The Azure DevOps Service Hook calls a signed Logic App callback URL. The URL sig
 ## Prerequisites
 
 - Azure CLI 2.55 or later with Bicep installed
-- Node.js 18 or later
 - Contributor access to the target Azure subscription or resource group
 - A SharePoint site and document library
 - A Microsoft 365 account that can read the SharePoint document
@@ -62,10 +61,46 @@ The path is site-relative and must include the document library name. Updating t
 
 1. Create or select the destination Team and channel.
 2. Add the Teams connector account to the Team. Add it explicitly to private channels.
-3. In Teams, open the channel menu and select **Get link to channel**.
-4. Extract `groupId` from the query string. This is `teamsTeamId`.
-5. Decode the channel segment after `/channel/`. This is `teamsChannelId` and normally has the form `19:...@thread.tacv2`.
-6. Add those values to each rule in `routing-rules.json`:
+3. In the Teams desktop or web client, select the three-dot menu next to the channel.
+4. Select **Get link to channel**, then select **Copy**.
+5. Identify the encoded value between `/channel/` and the channel display name. URL-decode this value to obtain `teamsChannelId`.
+6. Read the `groupId` query-string value to obtain `teamsTeamId`.
+7. Read the `tenantId` query-string value when you need to confirm which Microsoft Entra tenant owns the Team.
+
+For example, this channel link:
+
+```text
+https://teams.cloud.microsoft/l/channel/19%3ANQb2njN0ABU9cqxTnQXgcqrjf9XojzGs2NC9D20cIYM1%40thread.tacv2/Devops%20Notification%20Channel?groupId=a5b3fdd9-4ffb-49a4-916c-15f5aea86fef&tenantId=c508696d-bdfc-487a-b57b-138782c41da2
+```
+
+contains:
+
+```text
+teamsChannelId = 19:NQb2njN0ABU9cqxTnQXgcqrjf9XojzGs2NC9D20cIYM1@thread.tacv2
+teamsTeamId    = a5b3fdd9-4ffb-49a4-916c-15f5aea86fef
+tenantId       = c508696d-bdfc-487a-b57b-138782c41da2
+```
+
+You can extract the values in PowerShell:
+
+```powershell
+$channelLink = "<PASTE_TEAMS_CHANNEL_LINK>"
+$channelUri = [uri]$channelLink
+$pathParts = $channelUri.AbsolutePath.Trim('/').Split('/')
+$query = [System.Web.HttpUtility]::ParseQueryString($channelUri.Query)
+
+$teamsChannelId = [uri]::UnescapeDataString($pathParts[2])
+$teamsTeamId = $query['groupId']
+$tenantId = $query['tenantId']
+
+[pscustomobject]@{
+  TeamsChannelId = $teamsChannelId
+  TeamsTeamId = $teamsTeamId
+  TenantId = $tenantId
+}
+```
+
+8. Add the Team and channel IDs to each applicable rule in `routing-rules.json`:
 
 ```json
 "routing": {
@@ -128,31 +163,53 @@ Both resources must show `Connected`. Reauthorize a connection if its account, p
 
 ## 5. Get the Orchestrator Callback URL
 
-The complete callback URL is a credential. Do not commit it, publish it, or remove its `sig`, `sp`, or `sv` query parameters.
+Generate the callback URL after deploying the Logic App. The complete URL contains a SAS signature and is a credential. Do not commit it, publish it, or remove its `sig`, `sp`, or `sv` query parameters.
 
 ### Azure Portal
 
-1. Open `la-notif-orchestrator-dev` in Azure Portal.
-2. Open **Logic app designer**.
-3. Select `Receive_WorkItem_Webhook`.
-4. Copy the **HTTP POST URL**.
+1. In Azure Portal, open resource group `rg-notifications-dev`.
+2. Open the Consumption Logic App `la-notif-orchestrator-dev`.
+3. Open **Logic app designer**.
+4. Expand or select the request trigger named `Receive_WorkItem_Webhook`.
+5. Copy the **HTTP POST URL** shown by the trigger.
+6. Confirm the copied URL includes all of these query-string parameters:
+   `api-version`, `sp`, `sv`, and `sig`.
+7. Paste the complete URL into the Azure DevOps Web Hook **URL** field. Do not add quotation marks or remove URL-encoded characters.
 
 ### Azure CLI
 
 ```powershell
+# Sign in and select the target subscription first.
+az login
+az account set --subscription "<SUBSCRIPTION_ID>"
+
 $subscriptionId = az account show --query id --output tsv
 $resourceGroup = "rg-notifications-dev"
 $logicApp = "la-notif-orchestrator-dev"
 $trigger = "Receive_WorkItem_Webhook"
 
+$callbackRequestUri = "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.Logic/workflows/$logicApp/triggers/$trigger/listCallbackUrl?api-version=2019-05-01"
+
 $callbackUrl = az rest `
   --method post `
-  --uri "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.Logic/workflows/$logicApp/triggers/$trigger/listCallbackUrl?api-version=2019-05-01" `
+  --uri $callbackRequestUri `
   --query value `
   --output tsv
+
+if (-not $callbackUrl -or $callbackUrl -notmatch '[?&]sig=') {
+  throw "A valid signed callback URL was not returned."
+}
+
+# Put the credential on the clipboard without printing it to shared logs.
+$callbackUrl | Set-Clipboard
+Write-Host "Signed callback URL copied to the clipboard."
 ```
 
-Use `$callbackUrl` directly. Do not print it in shared logs.
+Paste the clipboard value directly into each Azure DevOps Web Hook subscription. The same Orchestrator callback can receive both `workitem.created` and `workitem.updated` events.
+
+If Azure returns `ResourceNotFound`, verify the resource group, Logic App name, and trigger name. If it returns `AuthorizationFailed`, confirm the signed-in identity can read the Logic App and invoke `listCallbackUrl`.
+
+If the callback URL is exposed, regenerate the trigger access key in Azure Portal and update both Azure DevOps Service Hook subscriptions with the newly generated URL.
 
 ## 6. Configure Azure DevOps Service Hooks
 
@@ -198,6 +255,12 @@ Then verify the run chain in Azure Portal:
 
 The Orchestrator returns HTTP `202 Accepted` before all downstream processing finishes. Use Logic App run history to verify final delivery.
 
+You can also submit the checked-in sample event from PowerShell:
+
+```powershell
+.\scripts\test-e2e.ps1 -ResourceGroup rg-notifications-dev -Environment dev
+```
+
 ## Routing Rules
 
 Rules are evaluated in ascending numeric `priority`; lower values run first. More than one rule can match, producing multiple notifications.
@@ -215,9 +278,7 @@ Rules are evaluated in ascending numeric `priority`; lower values run first. Mor
 Before uploading a changed file to SharePoint, validate it locally:
 
 ```powershell
-Set-Location .\functions
-
-node -e "const Ajv=require('ajv');const addFormats=require('ajv-formats');const fs=require('fs');const schema=JSON.parse(fs.readFileSync('../config/routing-schema.json','utf8'));const data=JSON.parse(fs.readFileSync('../config/routing-rules.json','utf8'));const ajv=new Ajv({allErrors:true});addFormats(ajv);const ok=ajv.validate(schema,data);console.log(ok?'Schema validation passed':ajv.errors);process.exit(ok?0:1)"
+.\scripts\validate-rules.ps1
 ```
 
 ## Operations and Security
@@ -241,3 +302,4 @@ node -e "const Ajv=require('ajv');const addFormats=require('ajv-formats');const 
 | [bicep/main.bicep](bicep/main.bicep) | Root infrastructure deployment |
 | [bicep/modules/logic-apps.bicep](bicep/modules/logic-apps.bicep) | Logic Apps and API connections |
 | [scripts/deploy.ps1](scripts/deploy.ps1) | Deployment entry point |
+| [scripts/validate-rules.ps1](scripts/validate-rules.ps1) | Local routing-schema validation |

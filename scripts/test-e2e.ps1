@@ -1,20 +1,48 @@
-$url = "https://prod-68.eastus.logic.azure.com:443/workflows/74c48fb29bdd4a97afc11660ca4bebdf/triggers/Receive_WorkItem_Webhook/paths/invoke?api-version=2019-05-01&sp=%2Ftriggers%2FReceive_WorkItem_Webhook%2Frun&sv=1.0&sig=JYl3EdRtZ-WR7Ayb-6cbLoBRkq_cO6oiPZVq-MxhIlw"
-$payload = Get-Content C:\Projects\aveva\notificationspoc\docs\samples\ado-webhook-sample.json -Raw
-$r = Invoke-WebRequest -Method POST -Uri $url -Headers @{ "x-webhook-secret" = "" } -ContentType "application/json" -Body $payload
-Write-Host "Orchestrator trigger: HTTP $($r.StatusCode)"
-Write-Host "Waiting 15s for chain to complete..."
-Start-Sleep 15
-$tok = (az account get-access-token --query accessToken -o tsv)
-$base = "https://management.azure.com/subscriptions/852f8491-61e9-4d75-b79a-9744a28c42a5/resourceGroups/rg-notifpoc-dev/providers/Microsoft.Logic/workflows"
-foreach ($la in @('la-notif-orchestrator-dev','la-notif-dispatcher-dev','la-notif-teams-dev-connector')) {
-    $run = (Invoke-RestMethod -Uri "$base/$la/runs?api-version=2016-06-01&`$top=1" -Headers @{ Authorization = "Bearer $tok" }).value[0]
-    $status = $run.properties.status
-    $sym = if ($status -eq 'Succeeded') {'[OK]'} elseif ($status -eq 'Failed') {'[FAIL]'} else {'[...]'}
-    Write-Host "$sym $la -> $status"
-    if ($status -eq 'Failed') {
-        $acts = (Invoke-RestMethod -Uri "$base/$la/runs/$($run.name)/actions?api-version=2016-06-01" -Headers @{ Authorization = "Bearer $tok" }).value
-        $acts | Where-Object { $_.properties.status -eq 'Failed' } | ForEach-Object {
-            Write-Host "     x $($_.name): $($_.properties.error.message)"
-        }
+<#
+.SYNOPSIS
+    Sends the sample Azure DevOps event to the deployed Orchestrator.
+
+.EXAMPLE
+    .\scripts\test-e2e.ps1 -ResourceGroup rg-notifications-dev -Environment dev
+#>
+[CmdletBinding()]
+param (
+    [Parameter(Mandatory)]
+    [string]$ResourceGroup,
+
+    [ValidateSet('dev', 'staging', 'prod')]
+    [string]$Environment = 'dev',
+
+    [string]$SubscriptionId
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+if ($SubscriptionId) {
+    az account set --subscription $SubscriptionId
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to select subscription '$SubscriptionId'."
     }
 }
+
+$SubscriptionId = az account show --query id --output tsv
+if (-not $SubscriptionId) {
+    throw "No active Azure subscription. Run 'az login' first."
+}
+
+$logicAppName = "la-notif-orchestrator-$Environment"
+$triggerName = 'Receive_WorkItem_Webhook'
+$callbackUri = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.Logic/workflows/$logicAppName/triggers/$triggerName/listCallbackUrl?api-version=2019-05-01"
+$callbackUrl = az rest --method post --uri $callbackUri --query value --output tsv
+if (-not $callbackUrl) {
+    throw "Could not retrieve the callback URL for '$logicAppName'."
+}
+
+$samplePath = Join-Path (Split-Path -Parent $PSScriptRoot) 'docs\samples\ado-webhook-sample.json'
+$payload = Get-Content $samplePath -Raw
+$response = Invoke-RestMethod -Method Post -Uri $callbackUrl -ContentType 'application/json' -Body $payload
+
+Write-Host "Orchestrator accepted the test event." -ForegroundColor Green
+Write-Host "Correlation ID: $($response.correlationId)"
+Write-Host "Check the Orchestrator, Dispatcher, and Teams connector run histories for final delivery."
