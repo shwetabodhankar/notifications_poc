@@ -30,6 +30,15 @@
 .PARAMETER SendGridApiKey
     SendGrid API key for email delivery. Optional — omit to deploy without email (Teams still works).
 
+.PARAMETER SharePointServiceAccountEmail
+    Account used to authorize the SharePoint API connection.
+
+.PARAMETER SharePointSiteUrl
+    SharePoint site hosting routing-rules.json.
+
+.PARAMETER SharePointRulesFilePath
+    Site-relative path to routing-rules.json.
+
 .PARAMETER OwnerTech
     Technical owner email. Must be an @aveva.com address.
 
@@ -60,6 +69,15 @@ param (
     [string]$WebhookSecret,
 
     [string]$SendGridApiKey = 'SENDGRID_NOT_CONFIGURED',
+
+    [ValidatePattern('^https://[^/]+\.sharepoint\.com/sites/[^/]+/?$')]
+    [string]$SharePointSiteUrl = 'https://mngenvmcap628198.sharepoint.com/sites/demosite',
+
+    [ValidateNotNullOrEmpty()]
+    [string]$SharePointRulesFilePath = '/Shared Documents/routing-rules.json',
+
+    [ValidatePattern('^[^@\s]+@[^@\s]+\.[^@\s]+$')]
+    [string]$SharePointServiceAccountEmail = 'sbodhankar@MngEnvMCAP628198.onmicrosoft.com',
 
     [Parameter(Mandatory)]
     [ValidatePattern('(?i)^[^@\s]+@aveva\.com$')]
@@ -221,6 +239,9 @@ if ($LASTEXITCODE -ne 0) {
             adoOrganisationUrl    = @{ value = 'https://dev.azure.com/sbodhankar0209' }
             webhookSharedSecret   = @{ value = $WebhookSecret }
             sendGridApiKey        = @{ value = $SendGridApiKey }
+            sharePointServiceAccountEmail = @{ value = $SharePointServiceAccountEmail }
+            sharePointSiteUrl     = @{ value = $SharePointSiteUrl }
+            sharePointRulesFilePath = @{ value = $SharePointRulesFilePath }
             tags                  = @{ value = $resourceTags }
         }
     } | ConvertTo-Json -Depth 10 | Set-Content $armParamsPath
@@ -229,6 +250,9 @@ if ($LASTEXITCODE -ne 0) {
     $p = Get-Content $armParamsPath -Raw | ConvertFrom-Json
     $p.parameters.webhookSharedSecret = @{ value = $WebhookSecret }
     $p.parameters.sendGridApiKey      = @{ value = $SendGridApiKey }
+    $p.parameters | Add-Member -MemberType NoteProperty -Name sharePointServiceAccountEmail -Value @{ value = $SharePointServiceAccountEmail } -Force
+    $p.parameters | Add-Member -MemberType NoteProperty -Name sharePointSiteUrl -Value @{ value = $SharePointSiteUrl } -Force
+    $p.parameters | Add-Member -MemberType NoteProperty -Name sharePointRulesFilePath -Value @{ value = $SharePointRulesFilePath } -Force
     $p.parameters.tags                = @{ value = $resourceTags }
     $p | ConvertTo-Json -Depth 10 | Set-Content $armParamsPath
 }
