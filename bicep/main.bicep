@@ -26,11 +26,11 @@ param teamsServiceAccountEmail string = 'sbodhankar@MngEnvMCAP628198.onmicrosoft
 @description('Service account email for the SharePoint API connection')
 param sharePointServiceAccountEmail string = teamsServiceAccountEmail
 
-@description('SharePoint site hosting routing-rules.json')
+@description('SharePoint site hosting the routing rules list')
 param sharePointSiteUrl string = 'https://mngenvmcap628198.sharepoint.com/sites/demosite'
 
-@description('Site-relative path to routing-rules.json')
-param sharePointRulesFilePath string = '/Shared Documents/routing-rules.json'
+@description('ID of the SharePoint routing rules list')
+param sharePointRulesListId string = 'd65d5f16-b5d4-499e-bb16-baa6aac5ac0b'
 
 @description('Tags applied to all resources')
 param tags object = {
@@ -78,7 +78,7 @@ module logicApps './modules/logic-apps.bicep' = {
     teamsServiceAccountEmail: teamsServiceAccountEmail
     sharePointServiceAccountEmail: sharePointServiceAccountEmail
     sharePointSiteUrl: sharePointSiteUrl
-    sharePointRulesFilePath: sharePointRulesFilePath
+    sharePointRulesListId: sharePointRulesListId
     logAnalyticsWorkspaceId: appInsights.outputs.logAnalyticsWorkspaceId
     tags: tags
   }

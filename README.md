@@ -2,13 +2,13 @@
 
 ## Overview
 
-This proof of concept receives Azure DevOps work-item events, loads routing rules from a SharePoint document library, evaluates the rules, and sends notifications through Microsoft Teams and email.
+This proof of concept receives Azure DevOps work-item events, loads routing rules from a SharePoint list, evaluates the rules, and sends notifications through Microsoft Teams and email.
 
 ```text
 Azure DevOps Service Hook
         |
         v
-Orchestrator Logic App --reads--> SharePoint routing-rules.json
+Orchestrator Logic App --reads--> SharePoint RoutingRulesLatest list
         |
         v
 Dispatcher Logic App
@@ -28,34 +28,49 @@ The Azure DevOps Service Hook calls a signed Logic App callback URL. The URL sig
 | Dispatcher Logic App | Fans matching routes out to notification channels |
 | Teams Connector Logic App | Posts messages through an authenticated Microsoft Teams API connection |
 | Email Notifier Logic App | Sends email through Microsoft Graph using managed identity |
-| SharePoint document library | Hosts the live `routing-rules.json` configuration with document version history |
+| SharePoint list | Hosts the live routing configuration with list version history |
 | Application Insights and Log Analytics | Store workflow diagnostics and telemetry |
 
 ## Prerequisites
 
 - Azure CLI 2.55 or later with Bicep installed
 - Contributor access to the target Azure subscription or resource group
-- A SharePoint site and document library
-- A Microsoft 365 account that can read the SharePoint document
+- A SharePoint site with the routing rules list
+- A Microsoft 365 account that can read the SharePoint list
 - A Teams-licensed Microsoft 365 account that can post to the destination Team and channel
 - Permission to create Azure DevOps Service Hook subscriptions
 
 ## 1. Prepare SharePoint
 
 1. Open the target SharePoint site.
-2. Open its **Documents** library.
-3. Upload [config/routing-rules.json](config/routing-rules.json).
-4. Ensure the SharePoint connector account has read permission on the site and file.
-5. Keep SharePoint version history enabled for auditing and rollback.
+2. Create or open the `RoutingRulesLatest` list.
+3. Ensure it contains the internal column names documented below.
+4. Import or create the routing-rule rows.
+5. Ensure the SharePoint connector account has read permission on the site and list.
+6. Keep SharePoint version history enabled for auditing and rollback.
 
 The current development configuration uses:
 
 ```text
 Site: https://mngenvmcap628198.sharepoint.com/sites/demosite
-File: /Shared Documents/routing-rules.json
+List: RoutingRulesLatest
+List ID: d65d5f16-b5d4-499e-bb16-baa6aac5ac0b
 ```
 
-The path is site-relative and must include the document library name. Updating the SharePoint file changes routing without redeploying the Logic Apps.
+The Orchestrator reads enabled rows ordered by numeric `Priority`. Updating list rows changes routing without redeploying the Logic Apps. For Yes/No condition columns, `Yes` requires a true work-item value and `No` means any value.
+
+The workflow expects these SharePoint internal column names:
+
+| Purpose | Internal column |
+|---|---|
+| Rule identity and display name | `RuleId`, `Title` |
+| Ordering and activation | `Priority`, `Enabled` |
+| Text conditions | `Product`, `ProductLine`, `RulePriority`, `AreaPath`, `WorkItemType` |
+| Boolean conditions | `IsCyberSecurity`, `IsHotfix` |
+| Teams destination | `TeamsChannelName`, `TeamsTeamId`, `TeamsChannelId` |
+| Primary email destination | `EmailGroup` |
+
+`Scenarios`, escalation, and security-liaison columns are not used by the current POC.
 
 ## 2. Prepare Teams
 
@@ -100,14 +115,12 @@ $tenantId = $query['tenantId']
 }
 ```
 
-8. Add the Team and channel IDs to each applicable rule in `routing-rules.json`:
+8. Add the Team and channel IDs to each applicable SharePoint list row:
 
-```json
-"routing": {
-  "teamsChannelName": "Devops Notification Channel",
-  "teamsTeamId": "00000000-0000-0000-0000-000000000000",
-  "teamsChannelId": "19:example@thread.tacv2"
-}
+```text
+TeamsChannelName = Devops Notification Channel
+TeamsTeamId      = 00000000-0000-0000-0000-000000000000
+TeamsChannelId   = 19:example@thread.tacv2
 ```
 
 The connector path does not require Power Automate, a Teams Workflow, or an incoming webhook URL.
@@ -132,7 +145,7 @@ Deploy the development environment:
   -OwnerBusiness "business.owner@aveva.com" `
   -Team "RESEARCH TEAM" `
   -SharePointSiteUrl "https://mngenvmcap628198.sharepoint.com/sites/demosite" `
-  -SharePointRulesFilePath "/Shared Documents/routing-rules.json" `
+  -SharePointRulesListId "d65d5f16-b5d4-499e-bb16-baa6aac5ac0b" `
   -SharePointServiceAccountEmail "service.account@contoso.com"
 ```
 
@@ -289,7 +302,9 @@ Rules are listed in ascending numeric `priority`; lower values have higher prece
 
 `routing.emailGroup` accepts one address or a comma-separated list of addresses. The Email Logic App trims whitespace and sends one Graph message to all listed recipients.
 
-Before uploading a changed file to SharePoint, validate it locally:
+Teams and email notifications display all four IMS fields: IMS Product, IMS Product Line, IMS Hotfix, and IMS Cybersecurity. Boolean values are always displayed as `Yes` or `No`.
+
+The JSON file remains a source/reference copy that can be validated locally:
 
 ```powershell
 .\scripts\validate-rules.ps1
@@ -299,7 +314,7 @@ Before uploading a changed file to SharePoint, validate it locally:
 
 - Treat the complete callback URL as a secret. Regenerate its signature if it is exposed.
 - Grant SharePoint edit access only to routing administrators.
-- Use separate SharePoint files and callback URLs for development, staging, and production.
+- Use separate SharePoint lists and callback URLs for development, staging, and production.
 - Keep the Teams and SharePoint connector accounts licensed and limited to the required sites and channels.
 - Review Logic App run history and Application Insights when notifications do not arrive.
 - A SharePoint change does not require an Azure deployment. A workflow or Bicep change does.
@@ -308,7 +323,7 @@ Before uploading a changed file to SharePoint, validate it locally:
 
 | Path | Purpose |
 |---|---|
-| [config/routing-rules.json](config/routing-rules.json) | Source copy of the SharePoint routing configuration |
+| [config/routing-rules.json](config/routing-rules.json) | Source/reference copy of the routing configuration |
 | [config/routing-schema.json](config/routing-schema.json) | Validation schema for routing rules |
 | [logic-apps/orchestrator.json](logic-apps/orchestrator.json) | Signed callback, SharePoint loading, and rule matching |
 | [logic-apps/dispatcher.json](logic-apps/dispatcher.json) | Notification fan-out |

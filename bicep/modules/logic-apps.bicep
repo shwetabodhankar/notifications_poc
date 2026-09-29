@@ -28,11 +28,11 @@ param teamsServiceAccountEmail string = 'sbodhankar@MngEnvMCAP628198.onmicrosoft
 @description('Service account email used to authenticate the SharePoint API connection')
 param sharePointServiceAccountEmail string = teamsServiceAccountEmail
 
-@description('SharePoint site hosting routing-rules.json')
+@description('SharePoint site hosting the routing rules list')
 param sharePointSiteUrl string = 'https://mngenvmcap628198.sharepoint.com/sites/demosite'
 
-@description('Site-relative path to routing-rules.json')
-param sharePointRulesFilePath string = '/Shared Documents/routing-rules.json'
+@description('ID of the SharePoint routing rules list')
+param sharePointRulesListId string = 'd65d5f16-b5d4-499e-bb16-baa6aac5ac0b'
 
 @description('Resource tags')
 param tags object = {}
@@ -219,8 +219,8 @@ resource orchestratorLogicApp 'Microsoft.Logic/workflows@2019-05-01' = {
       sharePointSiteUrl: {
         value: sharePointSiteUrl
       }
-      sharePointRulesFilePath: {
-        value: sharePointRulesFilePath
+      sharePointRulesListId: {
+        value: sharePointRulesListId
       }
       dispatcherCallbackUrl: {
         value: listCallbackUrl(

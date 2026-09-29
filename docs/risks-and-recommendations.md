@@ -18,7 +18,7 @@
 **Recommendations:**
 
 - Use a dedicated managed service account.
-- Grant read-only access to the routing document.
+- Grant read-only access to the routing list.
 - Monitor API connection health and reauthorize after identity-policy changes.
 
 ## Teams Connector Identity
@@ -45,7 +45,7 @@
 
 ## SharePoint Availability
 
-**Risk:** The Orchestrator reads the routing document for every event, so SharePoint or connector outages block routing.
+**Risk:** The Orchestrator reads the routing list for every event, so SharePoint or connector outages block routing.
 
 **Recommendations:**
 

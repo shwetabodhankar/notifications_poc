@@ -30,10 +30,10 @@
     Account used to authorize the SharePoint API connection.
 
 .PARAMETER SharePointSiteUrl
-    SharePoint site hosting routing-rules.json.
+    SharePoint site hosting the routing rules list.
 
-.PARAMETER SharePointRulesFilePath
-    Site-relative path to routing-rules.json.
+.PARAMETER SharePointRulesListId
+    ID of the SharePoint routing rules list.
 
 .PARAMETER OwnerTech
     Technical owner email. Must be an @aveva.com address.
@@ -68,8 +68,8 @@ param (
     [ValidatePattern('^https://[^/]+\.sharepoint\.com/sites/[^/]+/?$')]
     [string]$SharePointSiteUrl = 'https://mngenvmcap628198.sharepoint.com/sites/demosite',
 
-    [ValidateNotNullOrEmpty()]
-    [string]$SharePointRulesFilePath = '/Shared Documents/routing-rules.json',
+    [ValidatePattern('^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')]
+    [string]$SharePointRulesListId = 'd65d5f16-b5d4-499e-bb16-baa6aac5ac0b',
 
     [ValidatePattern('^[^@\s]+@[^@\s]+\.[^@\s]+$')]
     [string]$SharePointServiceAccountEmail = 'sbodhankar@MngEnvMCAP628198.onmicrosoft.com',
@@ -222,7 +222,7 @@ if ($LASTEXITCODE -ne 0) {
             adoOrganisationUrl    = @{ value = 'https://dev.azure.com/sbodhankar0209' }
             sharePointServiceAccountEmail = @{ value = $SharePointServiceAccountEmail }
             sharePointSiteUrl     = @{ value = $SharePointSiteUrl }
-            sharePointRulesFilePath = @{ value = $SharePointRulesFilePath }
+            sharePointRulesListId = @{ value = $SharePointRulesListId }
             tags                  = @{ value = $resourceTags }
         }
     } | ConvertTo-Json -Depth 10 | Set-Content $armParamsPath
@@ -232,7 +232,7 @@ if ($LASTEXITCODE -ne 0) {
     $p.parameters.notificationFromEmail = @{ value = $NotificationFromEmail }
     $p.parameters | Add-Member -MemberType NoteProperty -Name sharePointServiceAccountEmail -Value @{ value = $SharePointServiceAccountEmail } -Force
     $p.parameters | Add-Member -MemberType NoteProperty -Name sharePointSiteUrl -Value @{ value = $SharePointSiteUrl } -Force
-    $p.parameters | Add-Member -MemberType NoteProperty -Name sharePointRulesFilePath -Value @{ value = $SharePointRulesFilePath } -Force
+    $p.parameters | Add-Member -MemberType NoteProperty -Name sharePointRulesListId -Value @{ value = $SharePointRulesListId } -Force
     $p.parameters.tags                = @{ value = $resourceTags }
     $p | ConvertTo-Json -Depth 10 | Set-Content $armParamsPath
 }

@@ -10,14 +10,14 @@
       "type": "string",
       "defaultValue": "https://mngenvmcap628198.sharepoint.com/sites/demosite",
       "metadata": {
-        "description": "SharePoint site hosting routing-rules.json"
+        "description": "SharePoint site hosting the routing rules list"
       }
     },
-    "sharePointRulesFilePath": {
+    "sharePointRulesListId": {
       "type": "string",
-      "defaultValue": "/Shared Documents/routing-rules.json",
+      "defaultValue": "d65d5f16-b5d4-499e-bb16-baa6aac5ac0b",
       "metadata": {
-        "description": "Site-relative path to routing-rules.json"
+        "description": "ID of the SharePoint routing rules list"
       }
     },
     "dispatcherCallbackUrl": {
@@ -178,10 +178,11 @@
                       }
                     },
                     "method": "get",
-                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('sharePointSiteUrl')))}/GetFileContentByPath",
+                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('sharePointSiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('sharePointRulesListId')))}/items",
                     "queries": {
-                      "path": "@parameters('sharePointRulesFilePath')",
-                      "inferContentType": true
+                      "$filter": "Enabled eq 1",
+                      "$orderby": "Priority asc",
+                      "$top": 100
                     },
                     "retryPolicy": {
                       "type": "exponential",
@@ -198,8 +199,8 @@
                     "Load_Routing_Rules": [ "Succeeded" ]
                   },
                   "inputs": {
-                    "from": "@body('Load_Routing_Rules')?['rules']",
-                    "where": "@and(equals(item()?['enabled'], true), or(empty(string(coalesce(item()?['conditions']?['product'], ''))), equals(toLower(string(coalesce(item()?['conditions']?['product'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['product'], ''))))), or(empty(string(coalesce(item()?['conditions']?['productLine'], ''))), equals(toLower(string(coalesce(item()?['conditions']?['productLine'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['productLine'], ''))))), or(empty(string(coalesce(item()?['conditions']?['priority'], ''))), equals(toLower(string(coalesce(item()?['conditions']?['priority'], ''))), 'any'), equals(string(coalesce(item()?['conditions']?['priority'], '')), string(coalesce(outputs('Compose_WorkItem_Fields')?['priority'], '')))), or(empty(string(coalesce(item()?['conditions']?['areaPath'], ''))), contains(toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['areaPath'], ''))), toLower(string(coalesce(item()?['conditions']?['areaPath'], ''))))), or(empty(string(coalesce(item()?['conditions']?['workItemType'], ''))), equals(toLower(string(coalesce(item()?['conditions']?['workItemType'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['workItemType'], ''))))), or(equals(item()?['conditions']?['isCyberSecurity'], null), equals(coalesce(outputs('Compose_WorkItem_Fields')?['isCyberSecurity'], false), item()?['conditions']?['isCyberSecurity'])), or(equals(item()?['conditions']?['isHotfix'], null), equals(coalesce(outputs('Compose_WorkItem_Fields')?['isHotfix'], false), item()?['conditions']?['isHotfix'])))"
+                    "from": "@body('Load_Routing_Rules')?['value']",
+                    "where": "@and(equals(coalesce(item()?['Enabled'], false), true), or(empty(string(coalesce(item()?['Product'], ''))), equals(toLower(string(coalesce(item()?['Product'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['product'], ''))))), or(empty(string(coalesce(item()?['ProductLine'], ''))), equals(toLower(string(coalesce(item()?['ProductLine'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['productLine'], ''))))), or(empty(string(coalesce(item()?['RulePriority'], ''))), equals(toLower(string(coalesce(item()?['RulePriority'], ''))), 'any'), equals(toLower(string(coalesce(item()?['RulePriority'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['priority'], ''))))), or(empty(string(coalesce(item()?['AreaPath'], ''))), contains(toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['areaPath'], ''))), toLower(string(coalesce(item()?['AreaPath'], ''))))), or(empty(string(coalesce(item()?['WorkItemType'], ''))), equals(toLower(string(coalesce(item()?['WorkItemType'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['workItemType'], ''))))), or(equals(coalesce(item()?['IsCyberSecurity'], false), false), equals(coalesce(outputs('Compose_WorkItem_Fields')?['isCyberSecurity'], false), true)), or(equals(coalesce(item()?['IsHotfix'], false), false), equals(coalesce(outputs('Compose_WorkItem_Fields')?['isHotfix'], false), true)))"
                   }
                 },
                 "Select_Routing_Decisions": {
@@ -210,9 +211,14 @@
                   "inputs": {
                     "from": "@take(body('Filter_Matching_Rules'), 1)",
                     "select": {
-                      "ruleId": "@item()?['id']",
-                      "ruleName": "@item()?['name']",
-                      "routing": "@item()?['routing']"
+                      "ruleId": "@item()?['RuleId']",
+                      "ruleName": "@coalesce(item()?['Title'], item()?['RuleId'])",
+                      "routing": {
+                        "teamsChannelName": "@item()?['TeamsChannelName']",
+                        "teamsTeamId": "@item()?['TeamsTeamId']",
+                        "teamsChannelId": "@item()?['TeamsChannelId']",
+                        "emailGroup": "@item()?['EmailGroup']"
+                      }
                     }
                   }
                 },
@@ -224,7 +230,7 @@
                   "inputs": {
                     "matchedRuleCount": "@length(body('Select_Routing_Decisions'))",
                     "routingDecisions": "@body('Select_Routing_Decisions')",
-                    "scenarios": "@createArray('scenarioA')"
+                    "scenarios": "@json('[]')"
                   }
                 },
                 "Call_Dispatcher": {

@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.46.1.21595",
-      "templateHash": "2999791580376877218"
+      "templateHash": "8761234797044335504"
     }
   },
   "parameters": {
@@ -76,14 +76,14 @@
       "type": "string",
       "defaultValue": "https://mngenvmcap628198.sharepoint.com/sites/demosite",
       "metadata": {
-        "description": "SharePoint site hosting routing-rules.json"
+        "description": "SharePoint site hosting the routing rules list"
       }
     },
-    "sharePointRulesFilePath": {
+    "sharePointRulesListId": {
       "type": "string",
-      "defaultValue": "/Shared Documents/routing-rules.json",
+      "defaultValue": "d65d5f16-b5d4-499e-bb16-baa6aac5ac0b",
       "metadata": {
-        "description": "Site-relative path to routing-rules.json"
+        "description": "ID of the SharePoint routing rules list"
       }
     },
     "tags": {
@@ -289,8 +289,8 @@
           "sharePointSiteUrl": {
             "value": "[parameters('sharePointSiteUrl')]"
           },
-          "sharePointRulesFilePath": {
-            "value": "[parameters('sharePointRulesFilePath')]"
+          "sharePointRulesListId": {
+            "value": "[parameters('sharePointRulesListId')]"
           },
           "logAnalyticsWorkspaceId": {
             "value": "[reference(resourceId('Microsoft.Resources/deployments', format('appinsights-{0}', parameters('environmentName'))), '2025-04-01').outputs.logAnalyticsWorkspaceId.value]"
@@ -306,7 +306,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.46.1.21595",
-              "templateHash": "8765195192396555169"
+              "templateHash": "4792671901834869766"
             }
           },
           "parameters": {
@@ -377,14 +377,14 @@
               "type": "string",
               "defaultValue": "https://mngenvmcap628198.sharepoint.com/sites/demosite",
               "metadata": {
-                "description": "SharePoint site hosting routing-rules.json"
+                "description": "SharePoint site hosting the routing rules list"
               }
             },
-            "sharePointRulesFilePath": {
+            "sharePointRulesListId": {
               "type": "string",
-              "defaultValue": "/Shared Documents/routing-rules.json",
+              "defaultValue": "d65d5f16-b5d4-499e-bb16-baa6aac5ac0b",
               "metadata": {
-                "description": "Site-relative path to routing-rules.json"
+                "description": "ID of the SharePoint routing rules list"
               }
             },
             "tags": {
@@ -521,7 +521,7 @@
                       "Succeeded"
                     ]
                   },
-                  "inputs": "@concat('<h3>', outputs('Determine_Flags'), 'Work Item ', outputs('Determine_Event_Action'), ' &mdash; ', triggerBody()?['workItem']?['product'], '</h3><table><tr><td><b>Work Item</b></td><td>#', triggerBody()?['workItem']?['workItemId'], ' &mdash; ', triggerBody()?['workItem']?['title'], '</td></tr><tr><td><b>Type</b></td><td>', triggerBody()?['workItem']?['workItemType'], '</td></tr><tr><td><b>Priority</b></td><td>', outputs('Determine_Priority_Label'), '</td></tr><tr><td><b>State</b></td><td>', triggerBody()?['workItem']?['state'], '</td></tr><tr><td><b>Assigned To</b></td><td>', coalesce(triggerBody()?['workItem']?['assignedTo'], 'Unassigned'), '</td></tr><tr><td><b>Area Path</b></td><td>', triggerBody()?['workItem']?['areaPath'], '</td></tr><tr><td><b>Project</b></td><td>', triggerBody()?['workItem']?['teamProject'], '</td></tr><tr><td><b>Routing Rule</b></td><td>[', triggerBody()?['ruleId'], '] ', triggerBody()?['ruleName'], '</td></tr><tr><td><b>Correlation ID</b></td><td>', triggerBody()?['correlationId'], '</td></tr></table><p><a href=\"', triggerBody()?['workItem']?['workItemUrl'], '\">Open in Azure DevOps</a></p>')"
+                  "inputs": "@concat('<h3>', outputs('Determine_Flags'), 'Work Item ', outputs('Determine_Event_Action'), ' &mdash; ', coalesce(triggerBody()?['workItem']?['product'], 'Not specified'), '</h3><table><tr><td><b>Work Item</b></td><td>#', triggerBody()?['workItem']?['workItemId'], ' &mdash; ', triggerBody()?['workItem']?['title'], '</td></tr><tr><td><b>Type</b></td><td>', triggerBody()?['workItem']?['workItemType'], '</td></tr><tr><td><b>Priority</b></td><td>', outputs('Determine_Priority_Label'), '</td></tr><tr><td><b>State</b></td><td>', triggerBody()?['workItem']?['state'], '</td></tr><tr><td><b>IMS Product</b></td><td>', coalesce(triggerBody()?['workItem']?['product'], 'Not specified'), '</td></tr><tr><td><b>IMS Product Line</b></td><td>', coalesce(triggerBody()?['workItem']?['productLine'], 'Not specified'), '</td></tr><tr><td><b>IMS Hotfix</b></td><td>', if(equals(coalesce(triggerBody()?['workItem']?['isHotfix'], false), true), 'Yes', 'No'), '</td></tr><tr><td><b>IMS Cybersecurity</b></td><td>', if(equals(coalesce(triggerBody()?['workItem']?['isCyberSecurity'], false), true), 'Yes', 'No'), '</td></tr><tr><td><b>Assigned To</b></td><td>', coalesce(triggerBody()?['workItem']?['assignedTo'], 'Unassigned'), '</td></tr><tr><td><b>Area Path</b></td><td>', triggerBody()?['workItem']?['areaPath'], '</td></tr><tr><td><b>Project</b></td><td>', triggerBody()?['workItem']?['teamProject'], '</td></tr><tr><td><b>Routing Rule</b></td><td>[', triggerBody()?['ruleId'], '] ', triggerBody()?['ruleName'], '</td></tr><tr><td><b>Correlation ID</b></td><td>', triggerBody()?['correlationId'], '</td></tr></table><p><a href=\"', triggerBody()?['workItem']?['workItemUrl'], '\">Open in Azure DevOps</a></p>')"
                 },
                 "Post_To_Teams_Channel": {
                   "type": "ApiConnection",
@@ -660,7 +660,7 @@
                       "Succeeded"
                     ]
                   },
-                  "inputs": "@concat('P', triggerBody()?['workItem']?['priority'])"
+                  "inputs": "@triggerBody()?['workItem']?['priority']"
                 },
                 "Compose_Email_Subject": {
                   "type": "Compose",
@@ -678,7 +678,7 @@
                       "Succeeded"
                     ]
                   },
-                  "inputs": "@concat(\n  '<!DOCTYPE html><html><head>',\n  '<style>',\n  'body { font-family: Segoe UI, Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }',\n  '.container { max-width: 650px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }',\n  '.header { background: ', if(equals(triggerBody()?['workItem']?['priority'], '1'), '#D83B01', if(equals(triggerBody()?['workItem']?['priority'], '2'), '#E86500', '#0078D4')), '; color: white; padding: 20px 24px; }',\n  '.header h1 { margin: 0; font-size: 18px; }',\n  '.header .subtitle { margin: 4px 0 0; font-size: 13px; opacity: 0.85; }',\n  '.body { padding: 24px; }',\n  '.fact-table { width: 100%; border-collapse: collapse; margin: 16px 0; }',\n  '.fact-table td { padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 14px; }',\n  '.fact-table td:first-child { font-weight: 600; color: #444; width: 130px; }',\n  '.badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 12px; font-weight: 600; }',\n  '.badge-critical { background: #FDE7E9; color: #D83B01; }',\n  '.badge-security { background: #FDE7E9; color: #A4262C; }',\n  '.badge-normal { background: #EFF6FC; color: #0078D4; }',\n  '.cta { margin: 20px 0 0; text-align: center; }',\n  '.cta a { background: #0078D4; color: white; padding: 10px 24px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 600; }',\n  '.footer { padding: 16px 24px; background: #f9f9f9; font-size: 12px; color: #666; border-top: 1px solid #eee; }',\n  '</style></head><body>',\n  '<div class=\"container\">',\n  '<div class=\"header\">',\n  '<h1>Work Item ', if(equals(triggerBody()?['workItem']?['eventType'], 'workitem.created'), 'Created', 'Updated'), '</h1>',\n  '<div class=\"subtitle\">', triggerBody()?['workItem']?['product'], ' | ', triggerBody()?['emailType'], ' notification</div>',\n  '</div>',\n  '<div class=\"body\">',\n  if(contains(triggerBody()?['scenarios'], 'C'), '<p style=\"background:#FDE7E9;border-left:4px solid #A4262C;padding:10px 14px;margin:0 0 16px;\"><strong>⚠ Cyber Security Escalation:</strong> This work item has been flagged as a cyber security issue and requires immediate attention from the security team.</p>', ''),\n  if(contains(triggerBody()?['scenarios'], 'B'), '<p style=\"background:#FEF0CD;border-left:4px solid #E86500;padding:10px 14px;margin:0 0 16px;\"><strong>🚨 P1 Escalation:</strong> This is a Priority 1 item. Management escalation has been triggered.</p>', ''),\n  '<table class=\"fact-table\">',\n  '<tr><td>Work Item ID</td><td>#', triggerBody()?['workItem']?['workItemId'], '</td></tr>',\n  '<tr><td>Title</td><td>', triggerBody()?['workItem']?['title'], '</td></tr>',\n  '<tr><td>Type</td><td>', triggerBody()?['workItem']?['workItemType'], '</td></tr>',\n  '<tr><td>Priority</td><td><span class=\"badge ', if(equals(triggerBody()?['workItem']?['priority'], '1'), 'badge-critical', 'badge-normal'), '\">', outputs('Determine_Priority_Label'), '</span></td></tr>',\n  '<tr><td>State</td><td>', triggerBody()?['workItem']?['state'], '</td></tr>',\n        '<tr><td>Product</td><td>', triggerBody()?['workItem']?['product'], if(empty(triggerBody()?['workItem']?['productLine']), '', concat(' / ', triggerBody()?['workItem']?['productLine'])), '</td></tr>',\n  '<tr><td>Area Path</td><td>', triggerBody()?['workItem']?['areaPath'], '</td></tr>',\n  '<tr><td>Project</td><td>', triggerBody()?['workItem']?['teamProject'], '</td></tr>',\n  '<tr><td>Assigned To</td><td>', coalesce(triggerBody()?['workItem']?['assignedTo'], 'Unassigned'), '</td></tr>',\n  if(equals(triggerBody()?['workItem']?['isCyberSecurity'], true), '<tr><td>Cyber Security</td><td><span class=\"badge badge-security\">YES</span></td></tr>', ''),\n  if(equals(triggerBody()?['workItem']?['isHotfix'], true), '<tr><td>Hotfix</td><td><span class=\"badge badge-critical\">YES</span></td></tr>', ''),\n  '<tr><td>Routing Rule</td><td>[', triggerBody()?['ruleId'], '] ', triggerBody()?['ruleName'], '</td></tr>',\n  '<tr><td>Correlation ID</td><td><code style=\"font-size:11px;\">', triggerBody()?['correlationId'], '</code></td></tr>',\n  '</table>',\n  '<div class=\"cta\"><a href=\"', triggerBody()?['workItem']?['workItemUrl'], '\">Open in Azure DevOps</a></div>',\n  '</div>',\n  '<div class=\"footer\">This notification was sent by the Azure Logic Apps Notification Routing System. Do not reply to this email.<br/>',\n  'Notification sent at ', utcNow('R'), '</div>',\n  '</div></body></html>'\n)"
+                  "inputs": "@concat(\n  '<!DOCTYPE html><html><head>',\n  '<style>',\n  'body { font-family: Segoe UI, Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }',\n  '.container { max-width: 650px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }',\n  '.header { background: ', if(equals(triggerBody()?['workItem']?['priority'], 'P1'), '#D83B01', if(equals(triggerBody()?['workItem']?['priority'], 'P2'), '#E86500', '#0078D4')), '; color: white; padding: 20px 24px; }',\n  '.header h1 { margin: 0; font-size: 18px; }',\n  '.header .subtitle { margin: 4px 0 0; font-size: 13px; opacity: 0.85; }',\n  '.body { padding: 24px; }',\n  '.fact-table { width: 100%; border-collapse: collapse; margin: 16px 0; }',\n  '.fact-table td { padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 14px; }',\n  '.fact-table td:first-child { font-weight: 600; color: #444; width: 150px; }',\n  '.badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 12px; font-weight: 600; }',\n  '.badge-critical { background: #FDE7E9; color: #D83B01; }',\n  '.badge-security { background: #FDE7E9; color: #A4262C; }',\n  '.badge-normal { background: #EFF6FC; color: #0078D4; }',\n  '.cta { margin: 20px 0 0; text-align: center; }',\n  '.cta a { background: #0078D4; color: white; padding: 10px 24px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 600; }',\n  '.footer { padding: 16px 24px; background: #f9f9f9; font-size: 12px; color: #666; border-top: 1px solid #eee; }',\n  '</style></head><body>',\n  '<div class=\"container\">',\n  '<div class=\"header\">',\n  '<h1>Work Item ', if(equals(triggerBody()?['workItem']?['eventType'], 'workitem.created'), 'Created', 'Updated'), '</h1>',\n  '<div class=\"subtitle\">', coalesce(triggerBody()?['workItem']?['product'], 'Not specified'), ' | ', triggerBody()?['emailType'], ' notification</div>',\n  '</div>',\n  '<div class=\"body\">',\n  '<table class=\"fact-table\">',\n  '<tr><td>Work Item ID</td><td>#', triggerBody()?['workItem']?['workItemId'], '</td></tr>',\n  '<tr><td>Title</td><td>', triggerBody()?['workItem']?['title'], '</td></tr>',\n  '<tr><td>Type</td><td>', triggerBody()?['workItem']?['workItemType'], '</td></tr>',\n  '<tr><td>Priority</td><td><span class=\"badge ', if(equals(triggerBody()?['workItem']?['priority'], 'P1'), 'badge-critical', 'badge-normal'), '\">', outputs('Determine_Priority_Label'), '</span></td></tr>',\n  '<tr><td>State</td><td>', triggerBody()?['workItem']?['state'], '</td></tr>',\n  '<tr><td>IMS Product</td><td>', coalesce(triggerBody()?['workItem']?['product'], 'Not specified'), '</td></tr>',\n  '<tr><td>IMS Product Line</td><td>', coalesce(triggerBody()?['workItem']?['productLine'], 'Not specified'), '</td></tr>',\n  '<tr><td>IMS Hotfix</td><td>', if(equals(coalesce(triggerBody()?['workItem']?['isHotfix'], false), true), '<span class=\"badge badge-critical\">Yes</span>', '<span class=\"badge badge-normal\">No</span>'), '</td></tr>',\n  '<tr><td>IMS Cybersecurity</td><td>', if(equals(coalesce(triggerBody()?['workItem']?['isCyberSecurity'], false), true), '<span class=\"badge badge-security\">Yes</span>', '<span class=\"badge badge-normal\">No</span>'), '</td></tr>',\n  '<tr><td>Area Path</td><td>', triggerBody()?['workItem']?['areaPath'], '</td></tr>',\n  '<tr><td>Project</td><td>', triggerBody()?['workItem']?['teamProject'], '</td></tr>',\n  '<tr><td>Assigned To</td><td>', coalesce(triggerBody()?['workItem']?['assignedTo'], 'Unassigned'), '</td></tr>',\n  '<tr><td>Routing Rule</td><td>[', triggerBody()?['ruleId'], '] ', triggerBody()?['ruleName'], '</td></tr>',\n  '<tr><td>Correlation ID</td><td><code style=\"font-size:11px;\">', triggerBody()?['correlationId'], '</code></td></tr>',\n  '</table>',\n  '<div class=\"cta\"><a href=\"', triggerBody()?['workItem']?['workItemUrl'], '\">Open in Azure DevOps</a></div>',\n  '</div>',\n  '<div class=\"footer\">This notification was sent by the Azure Logic Apps Notification Routing System. Do not reply to this email.<br/>',\n  'Notification sent at ', utcNow('R'), '</div>',\n  '</div></body></html>'\n)"
                 },
                 "Select_Email_Recipients": {
                   "type": "Select",
@@ -1184,14 +1184,14 @@
                   "type": "string",
                   "defaultValue": "https://mngenvmcap628198.sharepoint.com/sites/demosite",
                   "metadata": {
-                    "description": "SharePoint site hosting routing-rules.json"
+                    "description": "SharePoint site hosting the routing rules list"
                   }
                 },
-                "sharePointRulesFilePath": {
+                "sharePointRulesListId": {
                   "type": "string",
-                  "defaultValue": "/Shared Documents/routing-rules.json",
+                  "defaultValue": "d65d5f16-b5d4-499e-bb16-baa6aac5ac0b",
                   "metadata": {
-                    "description": "Site-relative path to routing-rules.json"
+                    "description": "ID of the SharePoint routing rules list"
                   }
                 },
                 "dispatcherCallbackUrl": {
@@ -1380,10 +1380,11 @@
                                   }
                                 },
                                 "method": "get",
-                                "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('sharePointSiteUrl')))}/GetFileContentByPath",
+                                "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('sharePointSiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('sharePointRulesListId')))}/items",
                                 "queries": {
-                                  "path": "@parameters('sharePointRulesFilePath')",
-                                  "inferContentType": true
+                                  "$filter": "Enabled eq 1",
+                                  "$orderby": "Priority asc",
+                                  "$top": 100
                                 },
                                 "retryPolicy": {
                                   "type": "exponential",
@@ -1402,8 +1403,8 @@
                                 ]
                               },
                               "inputs": {
-                                "from": "@body('Load_Routing_Rules')?['rules']",
-                                "where": "@and(equals(item()?['enabled'], true), or(empty(string(coalesce(item()?['conditions']?['product'], ''))), equals(toLower(string(coalesce(item()?['conditions']?['product'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['product'], ''))))), or(empty(string(coalesce(item()?['conditions']?['productLine'], ''))), equals(toLower(string(coalesce(item()?['conditions']?['productLine'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['productLine'], ''))))), or(empty(string(coalesce(item()?['conditions']?['priority'], ''))), equals(toLower(string(coalesce(item()?['conditions']?['priority'], ''))), 'any'), equals(string(coalesce(item()?['conditions']?['priority'], '')), string(coalesce(outputs('Compose_WorkItem_Fields')?['priority'], '')))), or(empty(string(coalesce(item()?['conditions']?['areaPath'], ''))), contains(toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['areaPath'], ''))), toLower(string(coalesce(item()?['conditions']?['areaPath'], ''))))), or(empty(string(coalesce(item()?['conditions']?['workItemType'], ''))), equals(toLower(string(coalesce(item()?['conditions']?['workItemType'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['workItemType'], ''))))), or(equals(item()?['conditions']?['isCyberSecurity'], null), equals(coalesce(outputs('Compose_WorkItem_Fields')?['isCyberSecurity'], false), item()?['conditions']?['isCyberSecurity'])), or(equals(item()?['conditions']?['isHotfix'], null), equals(coalesce(outputs('Compose_WorkItem_Fields')?['isHotfix'], false), item()?['conditions']?['isHotfix'])))"
+                                "from": "@body('Load_Routing_Rules')?['value']",
+                                "where": "@and(equals(coalesce(item()?['Enabled'], false), true), or(empty(string(coalesce(item()?['Product'], ''))), equals(toLower(string(coalesce(item()?['Product'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['product'], ''))))), or(empty(string(coalesce(item()?['ProductLine'], ''))), equals(toLower(string(coalesce(item()?['ProductLine'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['productLine'], ''))))), or(empty(string(coalesce(item()?['RulePriority'], ''))), equals(toLower(string(coalesce(item()?['RulePriority'], ''))), 'any'), equals(toLower(string(coalesce(item()?['RulePriority'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['priority'], ''))))), or(empty(string(coalesce(item()?['AreaPath'], ''))), contains(toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['areaPath'], ''))), toLower(string(coalesce(item()?['AreaPath'], ''))))), or(empty(string(coalesce(item()?['WorkItemType'], ''))), equals(toLower(string(coalesce(item()?['WorkItemType'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['workItemType'], ''))))), or(equals(coalesce(item()?['IsCyberSecurity'], false), false), equals(coalesce(outputs('Compose_WorkItem_Fields')?['isCyberSecurity'], false), true)), or(equals(coalesce(item()?['IsHotfix'], false), false), equals(coalesce(outputs('Compose_WorkItem_Fields')?['isHotfix'], false), true)))"
                               }
                             },
                             "Select_Routing_Decisions": {
@@ -1416,9 +1417,14 @@
                               "inputs": {
                                 "from": "@take(body('Filter_Matching_Rules'), 1)",
                                 "select": {
-                                  "ruleId": "@item()?['id']",
-                                  "ruleName": "@item()?['name']",
-                                  "routing": "@item()?['routing']"
+                                  "ruleId": "@item()?['RuleId']",
+                                  "ruleName": "@coalesce(item()?['Title'], item()?['RuleId'])",
+                                  "routing": {
+                                    "teamsChannelName": "@item()?['TeamsChannelName']",
+                                    "teamsTeamId": "@item()?['TeamsTeamId']",
+                                    "teamsChannelId": "@item()?['TeamsChannelId']",
+                                    "emailGroup": "@item()?['EmailGroup']"
+                                  }
                                 }
                               }
                             },
@@ -1432,7 +1438,7 @@
                               "inputs": {
                                 "matchedRuleCount": "@length(body('Select_Routing_Decisions'))",
                                 "routingDecisions": "@body('Select_Routing_Decisions')",
-                                "scenarios": "@createArray('scenarioA')"
+                                "scenarios": "@json('[]')"
                               }
                             },
                             "Call_Dispatcher": {
@@ -1763,8 +1769,8 @@
                   "sharePointSiteUrl": {
                     "value": "[parameters('sharePointSiteUrl')]"
                   },
-                  "sharePointRulesFilePath": {
-                    "value": "[parameters('sharePointRulesFilePath')]"
+                  "sharePointRulesListId": {
+                    "value": "[parameters('sharePointRulesListId')]"
                   },
                   "dispatcherCallbackUrl": {
                     "value": "[listCallbackUrl(format('{0}/triggers/Receive_Dispatch_Request', resourceId('Microsoft.Logic/workflows', parameters('dispatcherLaName'))), '2019-05-01').value]"

@@ -41,7 +41,7 @@ Think of it like a **postal sorting office**:
 | 3 | `Custom.IMSProductLine = DevOps` | Azure DevOps - Project Migration |
 | 4 | Anything else | General Support |
 
-Rules are stored in `config/routing-rules.json` and can be updated without redeploying any code.
+Live rules are stored in the SharePoint `RoutingRulesLatest` list and can be updated without redeploying any code. `config/routing-rules.json` remains a source/reference copy.
 
 ---
 
@@ -65,7 +65,7 @@ Azure DevOps
     ▼
 Orchestrator
     │  1. Validates webhook secret
-    │  2. Loads routing-rules.json from SharePoint
+    │  2. Loads enabled rows from RoutingRulesLatest
     │  3. Matches work item against rules
     │  4. Builds routing decision
     ▼
@@ -147,7 +147,7 @@ Azure DevOps  →  Orchestrator  →  Dispatcher  →  Teams Notifier  →  Team
 
 > "This is the part that makes it genuinely useful for AVEVA."
 
-Open `config/routing-rules.json` or show the table.
+Open the SharePoint `RoutingRulesLatest` list or show the table.
 
 There are four rules today. Each rule says:
 
@@ -188,7 +188,7 @@ Fire a test webhook payload and show:
 > "A few things worth calling out for enterprise readiness."
 
 - **Webhook secret validation** — every incoming request from ADO is validated against a shared secret. Unsigned requests are rejected with 401.
-- **SharePoint permissions** — the routing document is available only to the connector account and authorized configuration owners.
+- **SharePoint permissions** — the routing list is available only to the connector account and authorized configuration owners.
 - **Managed Identity** — Logic Apps authenticate to storage using Azure Managed Identity, not connection strings or keys. No secrets in config.
 - **Async response** — the orchestrator returns 202 immediately and processes asynchronously, so ADO never times out waiting for a response.
 - **Full audit trail** — every run, every decision, every matched rule is logged in Azure Monitor with a correlation ID that links the ADO event to the Teams message.
