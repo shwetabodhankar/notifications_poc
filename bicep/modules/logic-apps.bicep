@@ -13,11 +13,7 @@ param emailNotifierLaName string
 @description('Azure region')
 param location string
 
-@description('SendGrid API key')
-@secure()
-param sendGridApiKey string
-
-@description('Notification from email address')
+@description('Microsoft 365 mailbox used by Microsoft Graph to send notifications')
 param notificationFromEmail string
 
 @description('Azure DevOps organisation base URL, e.g. https://dev.azure.com/myorg')
@@ -101,13 +97,13 @@ resource emailNotifierLogicApp 'Microsoft.Logic/workflows@2019-05-01' = {
   name: emailNotifierLaName
   location: location
   tags: tags
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     state: 'Enabled'
     definition: loadJsonContent('../../logic-apps/email-notifier.json')
     parameters: {
-      sendGridApiKey: {
-        value: sendGridApiKey
-      }
       emailFromAddress: {
         value: notificationFromEmail
       }
@@ -270,3 +266,4 @@ output orchestratorEndpoint string = listCallbackUrl(
 output teamsConnectorLogicAppName string = teamsConnectorLaName
 output teamsConnectionName string = teamsConnectionName
 output sharePointConnectionName string = sharePointConnectionName
+output emailNotifierPrincipalId string = emailNotifierLogicApp.identity.principalId

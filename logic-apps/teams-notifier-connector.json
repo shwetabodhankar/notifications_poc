@@ -40,7 +40,7 @@
                 "assignedTo":    { "type": "string" },
                 "priority":      { "type": "string" },
                 "product":       { "type": "string" },
-                "productFamily": { "type": "string" },
+                "productLine":   { "type": "string" },
                 "isCyberSecurity": {},
                 "isHotfix":      {},
                 "eventType":     { "type": "string" }

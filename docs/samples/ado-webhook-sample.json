@@ -19,10 +19,10 @@
       "System.Title": "Authentication bypass via session token",
       "System.AssignedTo": "john.doe@company.com",
       "Microsoft.VSTS.Common.Priority": 1,
-      "Custom.Product": "Ampla",
-      "Custom.ProductFamily": "SCADA",
-      "Custom.IsCyberSecurity": true,
-      "Custom.IsHotfix": false
+      "Custom.IMSProduct": "Development Tools",
+      "Custom.IMSProductLine": "DevOps",
+      "Custom.IMSCybersecurity": true,
+      "Custom.IMSHotfix": false
     },
     "rev": 3
   },

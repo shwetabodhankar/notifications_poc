@@ -74,11 +74,11 @@
 
 ## Email Delivery
 
-**Risk:** SendGrid credentials can expire or be exposed, and sender addresses may not be verified.
+**Risk:** Microsoft Graph `Mail.Send` application permission is tenant-wide unless Exchange Online application RBAC restricts the managed identity to the notification mailbox.
 
 **Recommendations:**
 
 - Supply the API key as a secure deployment parameter.
-- Use a verified sender/domain.
-- Rotate the key and avoid logging it.
-- Disable email routes when SendGrid is intentionally not configured.
+- Grant `Mail.Send` only to the Email Logic App managed identity.
+- Restrict the identity to the notification mailbox with Exchange Online application RBAC.
+- Monitor Graph `sendMail` failures and periodically review the role assignment.

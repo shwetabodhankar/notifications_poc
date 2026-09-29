@@ -4,16 +4,8 @@ param environmentName = 'dev'
 param location = 'westus2'
 param appName = 'notifypoc'
 param logRetentionDays = 30
-param notificationFromEmail = 'notifications-dev@company.com'
-
-// sendGridApiKey is optional — omit it to skip email; Teams notifications still work.
-// Supply at deploy time: az deployment group create --parameters sendGridApiKey=$env:SENDGRID_KEY
-// Do NOT commit real secret values to source control
-// Example:
-//   az deployment group create ... \
-//     --parameters sendGridApiKey="$env:SENDGRID_KEY"
+param notificationFromEmail = 'sbodhankar@MngEnvMCAP628198.onmicrosoft.com'
 param adoOrganisationUrl = 'https://dev.azure.com/sbodhankar0209'
-param sendGridApiKey = 'REPLACE_AT_DEPLOY_TIME'
 
 param tags = {
   environment: 'dev'

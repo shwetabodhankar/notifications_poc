@@ -1,29 +1,29 @@
 {
   "version": "2.0",
-  "lastModified": "2026-07-10T00:00:00Z",
+  "lastModified": "2026-09-28T00:00:00Z",
   "lastModifiedBy": "notification-admin@company.com",
   "rules": [
     {
       "id": "rule-001",
       "priority": 10,
-      "name": "Ampla — P1 CyberSecurity Escalation",
+      "name": "Cybersecurity Notification",
       "enabled": true,
       "effectiveFrom": "2024-01-01T00:00:00Z",
       "effectiveTo": null,
       "conditions": {
-        "product": "Ampla",
-        "productFamily": null,
+        "product": null,
+        "productLine": null,
         "areaPath": null,
-        "priority": "P1",
+        "priority": "Any",
         "workItemType": null,
         "isCyberSecurity": true,
         "isHotfix": null
       },
       "routing": {
-        "teamsChannelName": "Devops-Notifications-Channel",
+        "teamsChannelName": "Cybersecurity-Notifications",
         "teamsTeamId": "a5b3fdd9-4ffb-49a4-916c-15f5aea86fef",
         "teamsChannelId": "19:NQb2njN0ABU9cqxTnQXgcqrjf9XojzGs2NC9D20cIYM1@thread.tacv2",
-        "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com",
+        "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com,admin@MngEnvMCAP628198.onmicrosoft.com",
         "escalationGroup": "CISO-Team",
         "securityLiaison": "psirt@company.com",
         "scenarios": ["A", "B", "C"]
@@ -32,24 +32,24 @@
     {
       "id": "rule-002",
       "priority": 20,
-      "name": "Ampla — P1 Critical (Non-Security)",
+      "name": "P1 Critical Notification",
       "enabled": true,
       "effectiveFrom": "2024-01-01T00:00:00Z",
       "effectiveTo": null,
       "conditions": {
-        "product": "Ampla",
-        "productFamily": null,
+        "product": null,
+        "productLine": null,
         "areaPath": null,
         "priority": "P1",
         "workItemType": null,
-        "isCyberSecurity": false,
+        "isCyberSecurity": null,
         "isHotfix": null
       },
       "routing": {
         "teamsChannelName": "Operations-Critical",
         "teamsTeamId": "a5b3fdd9-4ffb-49a4-916c-15f5aea86fef",
         "teamsChannelId": "19:NQb2njN0ABU9cqxTnQXgcqrjf9XojzGs2NC9D20cIYM1@thread.tacv2",
-        "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com",
+        "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com,admin@MngEnvMCAP628198.onmicrosoft.com",
         "escalationGroup": "Operations-Managers",
         "securityLiaison": null,
         "scenarios": ["A", "B"]
@@ -58,13 +58,13 @@
     {
       "id": "rule-003",
       "priority": 30,
-      "name": "Ampla — Standard Routing",
+      "name": "DevOps Product Line Notification",
       "enabled": true,
       "effectiveFrom": "2024-01-01T00:00:00Z",
       "effectiveTo": null,
       "conditions": {
-        "product": "Ampla",
-        "productFamily": null,
+        "product": null,
+        "productLine": "DevOps",
         "areaPath": null,
         "priority": "Any",
         "workItemType": null,
@@ -72,52 +72,25 @@
         "isHotfix": null
       },
       "routing": {
-        "teamsChannelName": "Ampla-Engineering",
-        "teamsTeamId": "a5b3fdd9-4ffb-49a4-916c-15f5aea86fef",
-        "teamsChannelId": "19:NQb2njN0ABU9cqxTnQXgcqrjf9XojzGs2NC9D20cIYM1@thread.tacv2",
-        "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com",
+        "teamsChannelName": "Azure DevOps - Project Migration",
+        "teamsTeamId": "9e2fe54f-0a4c-40da-8181-13dfc6e3aa2e",
+        "teamsChannelId": "19:f402fe2b042b4179b35d7e5ae59a14b2@thread.tacv2",
+        "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com,admin@MngEnvMCAP628198.onmicrosoft.com",
         "escalationGroup": null,
         "securityLiaison": null,
         "scenarios": ["A"]
       }
     },
     {
-      "id": "rule-004",
-      "priority": 10,
-      "name": "InTouch — P1 CyberSecurity Escalation",
-      "enabled": true,
-      "effectiveFrom": "2024-01-01T00:00:00Z",
-      "effectiveTo": null,
-      "conditions": {
-        "product": "InTouch",
-        "productFamily": "HMI",
-        "areaPath": null,
-        "priority": "P1",
-        "workItemType": null,
-        "isCyberSecurity": true,
-        "isHotfix": null
-      },
-      "routing": {
-        "teamsChannelName": "Security-Critical-HMI",
-        "teamsTeamId": "a5b3fdd9-4ffb-49a4-916c-15f5aea86fef",
-        "teamsChannelId": "19:NQb2njN0ABU9cqxTnQXgcqrjf9XojzGs2NC9D20cIYM1@thread.tacv2",
-        "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com",
-        "escalationGroup": "CISO-Team",
-        "securityLiaison": "psirt@company.com",
-        "scenarios": ["A", "B", "C"]
-      }
-    },
-    
-    {
       "id": "rule-999",
       "priority": 999,
-      "name": "Catch-All — General Support",
+      "name": "Default General Notification",
       "enabled": true,
       "effectiveFrom": "2024-01-01T00:00:00Z",
       "effectiveTo": null,
       "conditions": {
         "product": null,
-        "productFamily": null,
+        "productLine": null,
         "areaPath": null,
         "priority": "Any",
         "workItemType": null,
@@ -128,7 +101,7 @@
         "teamsChannelName": "General-Support",
         "teamsTeamId": "a5b3fdd9-4ffb-49a4-916c-15f5aea86fef",
         "teamsChannelId": "19:NQb2njN0ABU9cqxTnQXgcqrjf9XojzGs2NC9D20cIYM1@thread.tacv2",
-        "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com",
+        "emailGroup": "sbodhankar@MngEnvMCAP628198.onmicrosoft.com,admin@MngEnvMCAP628198.onmicrosoft.com",
         "escalationGroup": null,
         "securityLiaison": null,
         "scenarios": ["A"]
@@ -136,7 +109,3 @@
     }
   ]
 }
-
-
-
-

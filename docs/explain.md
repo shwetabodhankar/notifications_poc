@@ -30,18 +30,16 @@ Think of it like a **postal sorting office**:
 
 ## The Routing Rules — Simple Explanation
 
-> "There's a configuration file that defines 9 routing rules. Each rule says: *if the work item is from Product X, with Priority Y, and has flag Z — send it to this Teams channel.* Rules are evaluated top-to-bottom, most specific first. The last rule is a catch-all so nothing gets lost."
+> "There's a configuration file that defines four ordered routing rules. The first matching rule determines the destination, and the last rule is a catch-all so nothing gets lost."
 
 **Example:**
 
-| Product | Priority | Flag | → Teams Channel |
-|---|---|---|---|
-| Ampla | P1 | CyberSecurity | Security-Critical-Ampla |
-| Ampla | P1 | (any) | Operations-Critical |
-| Ampla | (any) | (any) | Ampla-Engineering |
-| (any) | (any) | Hotfix | Hotfix channel |
-| (any) | (any) | CyberSecurity | Security-Bugs channel |
-| (any) | (any) | (any) | General Notifications |
+| Precedence | Condition | → Teams Channel |
+|---|---|---|
+| 1 | `Custom.IMSCybersecurity = true` | Cybersecurity Notifications |
+| 2 | Priority = P1 | Operations Critical |
+| 3 | `Custom.IMSProductLine = DevOps` | Azure DevOps - Project Migration |
+| 4 | Anything else | General Support |
 
 Rules are stored in `config/routing-rules.json` and can be updated without redeploying any code.
 
@@ -139,7 +137,7 @@ Azure DevOps  →  Orchestrator  →  Dispatcher  →  Teams Notifier  →  Team
 
 - **Teams Notifier** — formats a clean HTML message and posts it to the specified Teams channel using the Microsoft Teams API.
 
-- **Email Notifier** — sends a formatted HTML email via the Office 365 connector to the email group defined in the routing rule.
+- **Email Notifier** — sends a formatted HTML email through Microsoft Graph using the Logic App's managed identity.
 
 > "Why four apps instead of one? Because each one can be updated, monitored, and retried independently. If Teams is having a bad day, you don't lose the email. If you want to add Slack next month, you add a fifth app — nothing else changes."
 
@@ -151,21 +149,20 @@ Azure DevOps  →  Orchestrator  →  Dispatcher  →  Teams Notifier  →  Team
 
 Open `config/routing-rules.json` or show the table.
 
-There are 9 rules today. Each rule says:
+There are four rules today. Each rule says:
 
-> *"If the work item is for Product X, at Priority Y, with flag Z — send it to this Teams channel and this email group."*
+> *"If this is the first rule whose conditions match the work item, send it to this Teams channel and email group."*
 
 Show a few examples:
 
 | Rule | Fires when | Destination |
 |---|---|---|
-| rule-001 | Ampla + P1 + CyberSecurity | Security escalation channel + CISO team |
-| rule-002 | Ampla + P1 (any type) | Operations Critical channel |
-| rule-003 | Ampla + any priority | Ampla Engineering channel |
-| rule-007 | Any product + P1 + Hotfix | Hotfix Bridge channel + Release Managers |
-| rule-999 | Anything else | General Support — catch-all |
+| rule-001 | Cybersecurity = true | Cybersecurity Notifications + CISO team |
+| rule-002 | Priority = P1 | Operations Critical |
+| rule-003 | IMS Product Line = DevOps | Azure DevOps - Project Migration |
+| rule-999 | Anything else | General Support catch-all |
 
-> "Rules are evaluated in parallel — it's not first-match-wins. A single P1 CyberSecurity Ampla bug will trigger rule-001, rule-002, and rule-003 simultaneously, because all three teams genuinely need to know."
+> "Rules are evaluated in configuration order and the first match wins. A P1 cybersecurity item goes only to the cybersecurity destination; a non-security P1 goes to Operations Critical."
 
 > "The critical insight: **none of this is code**. Changing a routing rule means editing a JSON file and uploading it. You can add a new product, a new priority tier, a new channel — without touching any Logic App."
 
@@ -202,9 +199,9 @@ Fire a test webhook payload and show:
 
 > "This is a POC, so I want to be transparent about what's a proof-of-concept assumption versus what's production-ready."
 
-- **Product field dependency** — routing is based on `Custom.Product` in ADO. Work items that don't have this field fall through to the catch-all rule. That field needs to be consistently populated in ADO for precise routing.
-- **Teams channel per rule** — right now all rules point to the same demo channel. In production, each rule would have its own channel ID, which is just a data change in the routing rules JSON.
-- **Email auth** — the Office 365 email connector requires a delegated user OAuth token. In production, this would use a service account or be replaced with Microsoft Graph using Managed Identity.
+- **Product-line field dependency** — targeted routing uses `Custom.IMSProductLine` in ADO. If it is blank or misspelled, the item falls to the catch-all rule unless a higher-precedence cybersecurity or P1 rule matches.
+- **Teams channel per rule** — the DevOps rule uses the provided Azure DevOps - Project Migration channel. Confirm the production channel IDs for the cybersecurity, critical, and general rules before production use.
+- **Email authorization** — an Entra administrator must grant the Email Logic App managed identity the Microsoft Graph `Mail.Send` application role and restrict it to the notification mailbox.
 - **No deduplication** — if the same work item is updated 10 times in quick succession, you'll get 10 notifications. Rate limiting or deduplication logic would be a production addition.
 
 ---
@@ -215,7 +212,7 @@ Fire a test webhook payload and show:
 
 It proves that **AVEVA can have intelligent, product-aware, priority-aware notification routing in Azure DevOps — running entirely on Azure PaaS services, with no custom application to maintain, configurable by anyone who can edit a JSON file, and extensible to any channel.**
 
-The ask for the next step is: validate the routing rules model against AVEVA's real product taxonomy and work item structure, confirm the ADO field names (`Custom.Product`, `Custom.IsCyberSecurity`), and define the real Teams channel IDs. The infrastructure is ready — it's a data exercise from here.
+The ask for the next step is: validate the routing model against AVEVA's real product taxonomy and work item structure, confirm the configured IMS fields, and define the remaining production Teams channel IDs. The infrastructure is ready — it's a data exercise from here.
 
 ---
 

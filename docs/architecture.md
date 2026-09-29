@@ -26,7 +26,7 @@ flowchart LR
 | SharePoint API connection | Authenticate the Orchestrator's read access to the routing document |
 | Dispatcher | Fan matching rules out to Teams and email |
 | Teams connector | Post to the Team and channel identified by `teamsTeamId` and `teamsChannelId` |
-| Email notifier | Send primary and escalation messages through SendGrid |
+| Email notifier | Send primary and escalation messages through Microsoft Graph using managed identity |
 | Application Insights | Collect Logic App runtime diagnostics |
 
 ## Authentication

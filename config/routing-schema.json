@@ -83,14 +83,14 @@
             { "type": "string", "minLength": 1 },
             { "type": "null" }
           ],
-          "description": "Product name (e.g. Ampla, InTouch) or 'Any' for wildcard"
+          "description": "IMS product from Custom.IMSProduct or 'Any' for wildcard"
         },
-        "productFamily": {
+        "productLine": {
           "oneOf": [
             { "type": "string", "minLength": 1 },
             { "type": "null" }
           ],
-          "description": "Product family name or null for wildcard"
+          "description": "IMS product line from Custom.IMSProductLine or null for wildcard"
         },
         "areaPath": {
           "oneOf": [
@@ -123,14 +123,14 @@
             { "type": "boolean" },
             { "type": "null" }
           ],
-          "description": "Custom.IsCyberSecurity field value; null = match any"
+          "description": "Custom.IMSCybersecurity field value; null = match any"
         },
         "isHotfix": {
           "oneOf": [
             { "type": "boolean" },
             { "type": "null" }
           ],
-          "description": "Custom.IsHotfix field value; null = match any"
+          "description": "Custom.IMSHotfix field value; null = match any"
         }
       }
     },
@@ -166,8 +166,8 @@
         },
         "emailGroup": {
           "type": "string",
-          "format": "email",
-          "description": "Primary email distribution list"
+          "pattern": "^[^,\\s@]+@[^,\\s@]+\\.[^,\\s@]+(\\s*,\\s*[^,\\s@]+@[^,\\s@]+\\.[^,\\s@]+)*$",
+          "description": "Comma-separated primary email recipients"
         },
         "escalationGroup": {
           "oneOf": [

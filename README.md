@@ -27,7 +27,7 @@ The Azure DevOps Service Hook calls a signed Logic App callback URL. The URL sig
 | Orchestrator Logic App | Receives events, normalizes work-item fields, reads SharePoint rules, and selects matching routes |
 | Dispatcher Logic App | Fans matching routes out to notification channels |
 | Teams Connector Logic App | Posts messages through an authenticated Microsoft Teams API connection |
-| Email Notifier Logic App | Sends email through SendGrid |
+| Email Notifier Logic App | Sends email through Microsoft Graph using managed identity |
 | SharePoint document library | Hosts the live `routing-rules.json` configuration with document version history |
 | Application Insights and Log Analytics | Store workflow diagnostics and telemetry |
 
@@ -161,6 +161,18 @@ Bicep creates the API connection resources, but an interactive sign-in is requir
 
 Both resources must show `Connected`. Reauthorize a connection if its account, password, conditional-access policy, or consent changes.
 
+### Microsoft Graph email permission
+
+The Email Logic App uses a system-assigned managed identity and does not require an API connection or secret. After deployment, an Entra administrator must grant that identity the Microsoft Graph `Mail.Send` application role:
+
+```powershell
+.\scripts\grant-graph-mail-permission.ps1 `
+  -SubscriptionId "<SUBSCRIPTION_ID>" `
+  -ResourceGroup "rg-notifications-dev"
+```
+
+`Mail.Send` application permission is tenant-wide by default. Before production use, an Exchange administrator must use Exchange Online application RBAC to restrict the Email Logic App identity to the mailbox configured by `notificationFromEmail`.
+
 ## 5. Get the Orchestrator Callback URL
 
 Generate the callback URL after deploying the Logic App. The complete URL contains a SAS signature and is a credential. Do not commit it, publish it, or remove its `sig`, `sp`, or `sv` query parameters.
@@ -237,10 +249,10 @@ Create or update an Azure DevOps work item whose fields match a rule. For exampl
 ```text
 Work item type: Bug
 Priority: 1
-Custom.Product: Ampla
-Custom.ProductFamily: SCADA
-Custom.IsCyberSecurity: true
-Custom.IsHotfix: false
+Custom.IMSProduct: Development Tools
+Custom.IMSProductLine: DevOps
+Custom.IMSCybersecurity: true
+Custom.IMSHotfix: false
 ```
 
 Then verify the run chain in Azure Portal:
@@ -263,17 +275,19 @@ You can also submit the checked-in sample event from PowerShell:
 
 ## Routing Rules
 
-Rules are evaluated in ascending numeric `priority`; lower values run first. More than one rule can match, producing multiple notifications.
+Rules are listed in ascending numeric `priority`; lower values have higher precedence. The first matching rule produces the notification, so keep the catch-all rule last.
 
 | Condition | Azure DevOps source | Wildcard |
 |---|---|---|
-| `product` | `Custom.Product` | `"Any"` or `null` |
-| `productFamily` | `Custom.ProductFamily` | `null` |
+| `product` | `Custom.IMSProduct` | `"Any"` or `null` |
+| `productLine` | `Custom.IMSProductLine` | `null` |
 | `areaPath` | `System.AreaPath` substring | `null` |
 | `priority` | `Microsoft.VSTS.Common.Priority` | `"Any"` |
 | `workItemType` | `System.WorkItemType` | `null` |
-| `isCyberSecurity` | `Custom.IsCyberSecurity` | `null` |
-| `isHotfix` | `Custom.IsHotfix` | `null` |
+| `isCyberSecurity` | `Custom.IMSCybersecurity` | `null` |
+| `isHotfix` | `Custom.IMSHotfix` | `null` |
+
+`routing.emailGroup` accepts one address or a comma-separated list of addresses. The Email Logic App trims whitespace and sends one Graph message to all listed recipients.
 
 Before uploading a changed file to SharePoint, validate it locally:
 

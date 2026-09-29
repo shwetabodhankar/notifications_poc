@@ -159,10 +159,10 @@
                     "areaPath": "@coalesce(triggerBody()?['resource']?['revision']?['fields']?['System.AreaPath'], triggerBody()?['resource']?['fields']?['System.AreaPath'], '')",
                     "assignedTo": "@{coalesce(triggerBody()?['resource']?['revision']?['fields']?['System.AssignedTo'], triggerBody()?['resource']?['fields']?['System.AssignedTo'], '')}",
                     "priority": "@concat('P', string(coalesce(triggerBody()?['resource']?['revision']?['fields']?['Microsoft.VSTS.Common.Priority'], triggerBody()?['resource']?['fields']?['Microsoft.VSTS.Common.Priority'], 4)))",
-                    "product": "@coalesce(triggerBody()?['resource']?['revision']?['fields']?['Custom.Product'], triggerBody()?['resource']?['fields']?['Custom.Product'], 'Unknown')",
-                    "productFamily": "@coalesce(triggerBody()?['resource']?['revision']?['fields']?['Custom.ProductFamily'], triggerBody()?['resource']?['fields']?['Custom.ProductFamily'], '')",
-                    "isCyberSecurity": "@coalesce(triggerBody()?['resource']?['revision']?['fields']?['Custom.IsCyberSecurity'], triggerBody()?['resource']?['fields']?['Custom.IsCyberSecurity'], false)",
-                    "isHotfix": "@coalesce(triggerBody()?['resource']?['revision']?['fields']?['Custom.IsHotfix'], triggerBody()?['resource']?['fields']?['Custom.IsHotfix'], false)",
+                    "product": "@coalesce(triggerBody()?['resource']?['revision']?['fields']?['Custom.IMSProduct'], triggerBody()?['resource']?['fields']?['Custom.IMSProduct'], 'Unknown')",
+                    "productLine": "@coalesce(triggerBody()?['resource']?['revision']?['fields']?['Custom.IMSProductLine'], triggerBody()?['resource']?['fields']?['Custom.IMSProductLine'], '')",
+                    "isCyberSecurity": "@coalesce(triggerBody()?['resource']?['revision']?['fields']?['Custom.IMSCybersecurity'], triggerBody()?['resource']?['fields']?['Custom.IMSCybersecurity'], false)",
+                    "isHotfix": "@coalesce(triggerBody()?['resource']?['revision']?['fields']?['Custom.IMSHotfix'], triggerBody()?['resource']?['fields']?['Custom.IMSHotfix'], false)",
                     "adoEventId": "@coalesce(triggerBody()?['id'], guid())"
                   }
                 },
@@ -199,7 +199,7 @@
                   },
                   "inputs": {
                     "from": "@body('Load_Routing_Rules')?['rules']",
-                    "where": "@and(equals(item()?['enabled'], true), or(empty(string(coalesce(item()?['conditions']?['product'], ''))), equals(toLower(string(coalesce(item()?['conditions']?['product'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['product'], ''))))), or(empty(string(coalesce(item()?['conditions']?['priority'], ''))), equals(toLower(string(coalesce(item()?['conditions']?['priority'], ''))), 'any'), equals(string(coalesce(item()?['conditions']?['priority'], '')), string(coalesce(outputs('Compose_WorkItem_Fields')?['priority'], '')))), or(empty(string(coalesce(item()?['conditions']?['areaPath'], ''))), contains(toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['areaPath'], ''))), toLower(string(coalesce(item()?['conditions']?['areaPath'], ''))))), or(empty(string(coalesce(item()?['conditions']?['workItemType'], ''))), equals(toLower(string(coalesce(item()?['conditions']?['workItemType'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['workItemType'], ''))))), or(not(equals(item()?['conditions']?['isCyberSecurity'], true)), equals(coalesce(outputs('Compose_WorkItem_Fields')?['isCyberSecurity'], false), true)), or(not(equals(item()?['conditions']?['isHotfix'], true)), equals(coalesce(outputs('Compose_WorkItem_Fields')?['isHotfix'], false), true)))"
+                    "where": "@and(equals(item()?['enabled'], true), or(empty(string(coalesce(item()?['conditions']?['product'], ''))), equals(toLower(string(coalesce(item()?['conditions']?['product'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['product'], ''))))), or(empty(string(coalesce(item()?['conditions']?['productLine'], ''))), equals(toLower(string(coalesce(item()?['conditions']?['productLine'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['productLine'], ''))))), or(empty(string(coalesce(item()?['conditions']?['priority'], ''))), equals(toLower(string(coalesce(item()?['conditions']?['priority'], ''))), 'any'), equals(string(coalesce(item()?['conditions']?['priority'], '')), string(coalesce(outputs('Compose_WorkItem_Fields')?['priority'], '')))), or(empty(string(coalesce(item()?['conditions']?['areaPath'], ''))), contains(toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['areaPath'], ''))), toLower(string(coalesce(item()?['conditions']?['areaPath'], ''))))), or(empty(string(coalesce(item()?['conditions']?['workItemType'], ''))), equals(toLower(string(coalesce(item()?['conditions']?['workItemType'], ''))), toLower(string(coalesce(outputs('Compose_WorkItem_Fields')?['workItemType'], ''))))), or(equals(item()?['conditions']?['isCyberSecurity'], null), equals(coalesce(outputs('Compose_WorkItem_Fields')?['isCyberSecurity'], false), item()?['conditions']?['isCyberSecurity'])), or(equals(item()?['conditions']?['isHotfix'], null), equals(coalesce(outputs('Compose_WorkItem_Fields')?['isHotfix'], false), item()?['conditions']?['isHotfix'])))"
                   }
                 },
                 "Select_Routing_Decisions": {
@@ -208,7 +208,7 @@
                     "Filter_Matching_Rules": [ "Succeeded" ]
                   },
                   "inputs": {
-                    "from": "@body('Filter_Matching_Rules')",
+                    "from": "@take(body('Filter_Matching_Rules'), 1)",
                     "select": {
                       "ruleId": "@item()?['id']",
                       "ruleName": "@item()?['name']",
@@ -222,7 +222,7 @@
                     "Select_Routing_Decisions": [ "Succeeded" ]
                   },
                   "inputs": {
-                    "matchedRuleCount": "@length(body('Filter_Matching_Rules'))",
+                    "matchedRuleCount": "@length(body('Select_Routing_Decisions'))",
                     "routingDecisions": "@body('Select_Routing_Decisions')",
                     "scenarios": "@createArray('scenarioA')"
                   }

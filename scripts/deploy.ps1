@@ -23,8 +23,8 @@
 .PARAMETER SubscriptionId
     Azure subscription ID. If provided, sets the active subscription before deploying.
 
-.PARAMETER SendGridApiKey
-    SendGrid API key for email delivery. Optional — omit to deploy without email (Teams still works).
+.PARAMETER NotificationFromEmail
+    Microsoft 365 mailbox used by Microsoft Graph to send notification emails.
 
 .PARAMETER SharePointServiceAccountEmail
     Account used to authorize the SharePoint API connection.
@@ -45,7 +45,7 @@
     Official team name used for Azure resource tagging.
 
 .EXAMPLE
-    .\deploy.ps1 -Environment dev -ResourceGroup rg-notifications-dev -SendGridApiKey $env:SENDGRID_KEY
+    .\deploy.ps1 -Environment dev -ResourceGroup rg-notifications-dev -NotificationFromEmail notifications@contoso.com
 #>
 [CmdletBinding()]
 param (
@@ -62,7 +62,8 @@ param (
 
     [string]$SubscriptionId,
 
-    [string]$SendGridApiKey = 'SENDGRID_NOT_CONFIGURED',
+    [ValidatePattern('^[^@\s]+@[^@\s]+\.[^@\s]+$')]
+    [string]$NotificationFromEmail = 'sbodhankar@MngEnvMCAP628198.onmicrosoft.com',
 
     [ValidatePattern('^https://[^/]+\.sharepoint\.com/sites/[^/]+/?$')]
     [string]$SharePointSiteUrl = 'https://mngenvmcap628198.sharepoint.com/sites/demosite',
@@ -205,7 +206,7 @@ Write-Host "  Compiling Bicep to ARM JSON..." -ForegroundColor White
 az bicep build --file $bicepMain --outfile $armJsonPath 2>&1 | Where-Object { $_ -notmatch '^WARNING|^A new Bicep' } | ForEach-Object { Write-Host $_ }
 if ($LASTEXITCODE -ne 0) { throw 'Bicep compilation failed.' }
 
-# Build parameter JSON from the bicepparam file, then inject runtime secrets
+# Build parameter JSON from the bicepparam file, then inject runtime values
 az bicep build-params --file $bicepParams --outfile $armParamsPath 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) {
     # Fallback: construct parameter JSON inline (bicep build-params not available)
@@ -217,9 +218,8 @@ if ($LASTEXITCODE -ne 0) {
             location              = @{ value = $Location }
             appName               = @{ value = $AppName }
             logRetentionDays      = @{ value = 30 }
-            notificationFromEmail = @{ value = "notifications-$Environment@company.com" }
+            notificationFromEmail = @{ value = $NotificationFromEmail }
             adoOrganisationUrl    = @{ value = 'https://dev.azure.com/sbodhankar0209' }
-            sendGridApiKey        = @{ value = $SendGridApiKey }
             sharePointServiceAccountEmail = @{ value = $SharePointServiceAccountEmail }
             sharePointSiteUrl     = @{ value = $SharePointSiteUrl }
             sharePointRulesFilePath = @{ value = $SharePointRulesFilePath }
@@ -227,9 +227,9 @@ if ($LASTEXITCODE -ne 0) {
         }
     } | ConvertTo-Json -Depth 10 | Set-Content $armParamsPath
 } else {
-    # Inject runtime secrets into the compiled params JSON
+    # Inject runtime values into the compiled params JSON
     $p = Get-Content $armParamsPath -Raw | ConvertFrom-Json
-    $p.parameters.sendGridApiKey      = @{ value = $SendGridApiKey }
+    $p.parameters.notificationFromEmail = @{ value = $NotificationFromEmail }
     $p.parameters | Add-Member -MemberType NoteProperty -Name sharePointServiceAccountEmail -Value @{ value = $SharePointServiceAccountEmail } -Force
     $p.parameters | Add-Member -MemberType NoteProperty -Name sharePointSiteUrl -Value @{ value = $SharePointSiteUrl } -Force
     $p.parameters | Add-Member -MemberType NoteProperty -Name sharePointRulesFilePath -Value @{ value = $SharePointRulesFilePath } -Force
@@ -312,9 +312,10 @@ $testPayload = @{
             'System.State'                           = 'Active'
             'System.Title'                           = 'Deployment Validation Test'
             'Microsoft.VSTS.Common.Priority'         = 4
-            'Custom.Product'                         = 'Unknown'
-            'Custom.IsCyberSecurity'                 = $false
-            'Custom.IsHotfix'                        = $false
+            'Custom.IMSProduct'                      = 'Unknown'
+            'Custom.IMSProductLine'                  = 'Unknown'
+            'Custom.IMSCybersecurity'                = $false
+            'Custom.IMSHotfix'                       = $false
         }
     }
     resourceContainers = @{
@@ -352,7 +353,10 @@ Write-Host "  │" -ForegroundColor Cyan
 Write-Host "  │  2. Authorize the SharePoint and Teams API connections" -ForegroundColor Cyan
 Write-Host "  │     in Azure Portal, then test a work-item event" -ForegroundColor Cyan
 Write-Host "  │" -ForegroundColor Cyan
-Write-Host "  │  3. Monitor via Application Insights:" -ForegroundColor Cyan
+Write-Host " │ 3. Ask an Entra administrator to grant Microsoft Graph" -ForegroundColor Cyan
+Write-Host " │     Mail.Send to principal: $($deploymentOutput.emailNotifierPrincipalId.value)" -ForegroundColor Cyan
+Write-Host " │" -ForegroundColor Cyan
+Write-Host " │ 4. Monitor via Application Insights:" -ForegroundColor Cyan
 Write-Host "  │     https://portal.azure.com/#resource/subscriptions/.../overview" -ForegroundColor Cyan
 Write-Host "  │" -ForegroundColor Cyan
 Write-Host "  └──────────────────────────────────────────────────────────┘" -ForegroundColor Cyan

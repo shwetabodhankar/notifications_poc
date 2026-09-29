@@ -9,12 +9,8 @@ param location string = resourceGroup().location
 @maxLength(10)
 param appName string = 'notifypoc'
 
-@description('SendGrid API key for email delivery. Leave as default placeholder to skip email — Teams notifications still work.')
-@secure()
-param sendGridApiKey string = 'SENDGRID_NOT_CONFIGURED'
-
-@description('Email address used as the From address for notifications')
-param notificationFromEmail string = 'notifications@company.com'
+@description('Microsoft 365 mailbox used by Microsoft Graph to send notifications')
+param notificationFromEmail string = 'sbodhankar@MngEnvMCAP628198.onmicrosoft.com'
 
 @description('Log Analytics workspace retention in days')
 @minValue(30)
@@ -77,7 +73,6 @@ module logicApps './modules/logic-apps.bicep' = {
     teamsNotifierLaName: teamsNotifierLaName
     emailNotifierLaName: emailNotifierLaName
     location: location
-    sendGridApiKey: sendGridApiKey
     notificationFromEmail: notificationFromEmail
     adoOrganisationUrl: adoOrganisationUrl
     teamsServiceAccountEmail: teamsServiceAccountEmail
@@ -98,3 +93,4 @@ output appInsightsName string = appInsights.outputs.appInsightsName
 output teamsConnectorLogicAppName string = logicApps.outputs.teamsConnectorLogicAppName
 output teamsConnectionName string = logicApps.outputs.teamsConnectionName
 output sharePointConnectionName string = logicApps.outputs.sharePointConnectionName
+output emailNotifierPrincipalId string = logicApps.outputs.emailNotifierPrincipalId
